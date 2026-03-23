@@ -1,0 +1,119 @@
+// This is your Prisma schema file.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  ADMIN
+  PASTOR
+  STAFF
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+enum DonationType {
+  TITHE
+  OFFERING
+  OTHERS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model FamilyGroup {
+  id          String   @id @default(cuid())
+  familyName  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  members     Member[]
+}
+
+model Member {
+  id             String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  gender        Gender?
+  birthdate     DateTime?
+  contactNumber String?
+  address       String?
+
+  familyGroupId String?
+  familyGroup   FamilyGroup? @relation(fields: [familyGroupId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendance Attendance[]
+  donations  Donation[]
+
+  @@index([lastName])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  // Treat as the "service" date for attendance.
+  date        DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendance Attendance[]
+}
+
+model Attendance {
+  id       String @id @default(cuid())
+  memberId String
+  eventId  String
+  // Service date (derived from event in the UI).
+  date     DateTime
+  status   AttendanceStatus
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id])
+  event  Event  @relation(fields: [eventId], references: [id])
+
+  @@unique([memberId, eventId])
+  @@index([eventId, date])
+}
+
+model Donation {
+  id       String  @id @default(cuid())
+  memberId String
+  amount   Decimal @db.Decimal(10, 2)
+  type     DonationType
+  date     DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([type, date])
+}

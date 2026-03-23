@@ -1,0 +1,277 @@
+import { NextResponse } from "next/server";
+import ExcelJS from "exceljs";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import {
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  Table,
+  TableRow,
+  TableCell,
+} from "docx";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "@/lib/auth";
+import type { Role } from "@/generated/prisma/enums";
+
+type Format = "xlsx" | "pdf" | "docx";
+type GroupBy = "daily" | "monthly" | "yearly";
+
+function toInputDate(value: string | null) {
+  if (!value) return null;
+  const s = value.trim();
+  if (!s) return null;
+  return s;
+}
+
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+function keyFor(d: Date, groupBy: GroupBy) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  if (groupBy === "daily") return `${y}-${m}-${day}`;
+  if (groupBy === "monthly") return `${y}-${m}`;
+  return `${y}`;
+}
+
+function labelFor(key: string, groupBy: GroupBy) {
+  // keep key human-readable
+  if (groupBy === "daily") return key;
+  if (groupBy === "monthly") return key;
+  return key;
+}
+
+function isAllowedRole(role: string): role is Role {
+  return role === "ADMIN" || role === "PASTOR";
+}
+
+async function financialData(params: URLSearchParams) {
+  const format = (params.get("format") ?? "xlsx") as Format;
+  const groupBy = (params.get("groupBy") ?? "monthly") as GroupBy;
+  const fromStr = toInputDate(params.get("from"));
+  const toStr = toInputDate(params.get("to"));
+
+  const allowedFormats: Format[] = ["xlsx", "pdf", "docx"];
+  const allowedGroupBy: GroupBy[] = ["daily", "monthly", "yearly"];
+
+  if (!allowedFormats.includes(format) || !allowedGroupBy.includes(groupBy)) {
+    return { error: "Invalid format/groupBy." as const };
+  }
+
+  const today = new Date();
+  const fromDate = fromStr ? new Date(fromStr) : new Date(today.getTime());
+  const toDate = toStr ? new Date(toStr) : today;
+
+  // Normalize range inclusively.
+  const start = startOfDay(fromDate);
+  const end = endOfDay(toDate);
+
+  const donations = await prisma.donation.findMany({
+    where: { date: { gte: start, lte: end } },
+    select: { date: true, amount: true, type: true },
+  });
+
+  const byKey: Record<
+    string,
+    {
+      key: string;
+      total: number;
+      TITHE: number;
+      OFFERING: number;
+      OTHERS: number;
+    }
+  > = {};
+
+  for (const d of donations) {
+    const k = keyFor(d.date, groupBy);
+    if (!byKey[k]) {
+      byKey[k] = {
+        key: k,
+        total: 0,
+        TITHE: 0,
+        OFFERING: 0,
+        OTHERS: 0,
+      };
+    }
+    const amt = Number(d.amount ?? 0);
+    byKey[k].total += amt;
+    if (d.type === "TITHE") byKey[k].TITHE += amt;
+    else if (d.type === "OFFERING") byKey[k].OFFERING += amt;
+    else byKey[k].OTHERS += amt;
+  }
+
+  const rows = Object.values(byKey).sort((a, b) =>
+    a.key.localeCompare(b.key),
+  );
+
+  return { format, groupBy, start, end, rows };
+}
+
+export async function GET(req: Request) {
+  const session = await getServerSession();
+  if (!session || !isAllowedRole(session.role)) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  }
+
+  const params = new URL(req.url).searchParams;
+
+  try {
+    const data = await financialData(params);
+    if ("error" in data) {
+      return NextResponse.json({ ok: false, message: data.error }, { status: 400 });
+    }
+
+    if (data.format === "xlsx") {
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Financial Report");
+
+      ws.columns = [
+        { header: "Period", key: "period", width: 20 },
+        { header: "Total", key: "total", width: 14 },
+        { header: "Tithe", key: "tithe", width: 14 },
+        { header: "Offering", key: "offering", width: 14 },
+        { header: "Others", key: "others", width: 14 },
+      ];
+
+      ws.getRow(1).font = { bold: true };
+      for (const r of data.rows) {
+        ws.addRow({
+          period: labelFor(r.key, data.groupBy),
+          total: r.total,
+          tithe: r.TITHE,
+          offering: r.OFFERING,
+          others: r.OTHERS,
+        });
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="financial-report.xlsx"`,
+        },
+      });
+    }
+
+    if (data.format === "pdf") {
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595.28, 841.89]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      const title = `Financial Report (${data.groupBy})`;
+      page.drawText(title, { x: 50, y: 800, size: 14, font });
+
+      page.drawText(
+        `Range: ${data.start.toLocaleDateString()} - ${data.end.toLocaleDateString()}`,
+        { x: 50, y: 780, size: 10, font },
+      );
+
+      let y = 740;
+      page.drawText(
+        "Period | Total | Tithe | Offering | Others",
+        { x: 50, y, size: 10, font },
+      );
+      y -= 18;
+
+      for (const r of data.rows) {
+        const line = `${r.key} | ${r.total.toFixed(2)} | ${r.TITHE.toFixed(
+          2,
+        )} | ${r.OFFERING.toFixed(2)} | ${r.OTHERS.toFixed(2)}`;
+        page.drawText(line, { x: 50, y, size: 9, font });
+        y -= 14;
+        if (y < 60) break;
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      return new NextResponse(Buffer.from(pdfBytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="financial-report.pdf"`,
+        },
+      });
+    }
+
+    // docx
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              text: `Financial Report (${data.groupBy})`,
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({
+              text: `Range: ${data.start.toLocaleDateString()} - ${data.end.toLocaleDateString()}`,
+            }),
+            new Paragraph({ text: "" }),
+            new Table({
+              width: { size: 100, type: "pct" },
+              columnWidths: [1600, 1200, 1200, 1200, 1200],
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph("Period")] }),
+                    new TableCell({ children: [new Paragraph("Total")] }),
+                    new TableCell({ children: [new Paragraph("Tithe")] }),
+                    new TableCell({ children: [new Paragraph("Offering")] }),
+                    new TableCell({ children: [new Paragraph("Others")] }),
+                  ],
+                }),
+                ...data.rows.map(
+                  (r) =>
+                    new TableRow({
+                      children: [
+                        new TableCell({
+                          children: [new Paragraph(labelFor(r.key, data.groupBy))],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph(r.total.toFixed(2))],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph(r.TITHE.toFixed(2))],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph(r.OFFERING.toFixed(2))],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph(r.OTHERS.toFixed(2))],
+                        }),
+                      ],
+                    }),
+                ),
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const buf = await Packer.toBuffer(doc);
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="financial-report.docx"`,
+      },
+    });
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "Failed to generate report." },
+      { status: 500 },
+    );
+  }
+}
+
