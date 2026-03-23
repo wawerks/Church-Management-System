@@ -7,7 +7,12 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 function toMariaDbUrl(url: string) {
   // @prisma/adapter-mariadb expects mariadb:// URLs.
   // Keep your DATABASE_URL compatible with Prisma migrations by converting here.
-  return url.startsWith("mysql://") ? url.replace("mysql://", "mariadb://") : url;
+  if (!url.startsWith("mysql://")) return url;
+  const u = new URL(url);
+  const user = u.username;
+  const pass = u.password; // may be empty string
+  const auth = pass ? `${user}:${pass}` : user;
+  return `mariadb://${auth}@${u.host}${u.pathname}${u.search}`;
 }
 
 export const prisma =

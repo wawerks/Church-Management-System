@@ -17,8 +17,14 @@ async function main() {
     );
   }
 
-  const toMariaDbUrl = (url: string) =>
-    url.startsWith("mysql://") ? url.replace("mysql://", "mariadb://") : url;
+  const toMariaDbUrl = (url: string) => {
+    if (!url.startsWith("mysql://")) return url;
+    const u = new URL(url);
+    const user = u.username;
+    const pass = u.password; // may be empty string
+    const auth = pass ? `${user}:${pass}` : user;
+    return `mariadb://${auth}@${u.host}${u.pathname}${u.search}`;
+  };
 
   const prisma = new PrismaClient({
     adapter: new PrismaMariaDb(toMariaDbUrl(databaseUrl)),
