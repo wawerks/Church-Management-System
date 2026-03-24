@@ -25,7 +25,7 @@ export default async function NewUserPage() {
         </Link>
       </div>
 
-      <form action={createUserAction} method="post" className="space-y-4">
+      <form action={createUserAction} className="space-y-4">
         <label className="block">
           <div className="mb-1 text-sm font-medium text-slate-700">Name</div>
           <input

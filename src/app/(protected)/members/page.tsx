@@ -168,7 +168,6 @@ export default async function MembersPage(props: {
 
                           <form
                             action={deleteMemberAction.bind(null, m.id)}
-                            method="post"
                           >
                             <SubmitButton
                               pendingLabel="Deleting…"

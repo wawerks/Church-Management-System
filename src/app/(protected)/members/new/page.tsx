@@ -30,7 +30,7 @@ export default async function NewMemberPage() {
         </p>
       </div>
 
-      <form action={createMemberAction} method="post" className="space-y-5">
+      <form action={createMemberAction} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">
             <div className="mb-1 text-sm font-medium text-slate-700">

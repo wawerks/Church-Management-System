@@ -69,7 +69,6 @@ export default async function EditMemberPage(props: {
 
       <form
         action={updateMemberAction.bind(null, member.id)}
-        method="post"
         className="space-y-5"
       >
         <div className="grid gap-4 md:grid-cols-2">

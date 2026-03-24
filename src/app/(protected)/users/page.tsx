@@ -95,7 +95,6 @@ export default async function UsersPage() {
                       ) : (
                         <form
                           action={deleteUserAction.bind(null, u.id)}
-                          method="post"
                         >
                           <SubmitButton
                             pendingLabel="Removing…"

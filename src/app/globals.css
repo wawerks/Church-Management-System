@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eaf3fa;
+  --foreground: #0f2f4a;
+  --primary: #0f4f77;
+  --primary-hover: #156792;
+  --surface: #ffffff;
+  --surface-soft: #f3f9fd;
+  --border: #d3e1ec;
+  --sidebar-bg: #0e5a84;
+  --sidebar-border: #1f6f99;
+  --sidebar-text: #ecf7ff;
+  --sidebar-muted: #b8d8eb;
   color-scheme: light;
 }
 
@@ -17,5 +26,133 @@ html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eaf3fa 0%, #e5f0f9 100%);
+}
+
+.page-transition {
+  animation: pageFadeSlide 260ms ease;
+}
+
+@keyframes pageFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bg-black,
+.bg-slate-900 {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.hover\:bg-black\/90:hover,
+.hover\:bg-slate-800:hover,
+.hover\:bg-slate-900\/90:hover {
+  background-color: var(--primary-hover) !important;
+}
+
+.border-slate-200 {
+  border-color: var(--border) !important;
+}
+
+.bg-white {
+  background-color: var(--surface) !important;
+}
+
+.text-slate-900,
+.text-slate-800,
+.text-slate-700 {
+  color: #143a56 !important;
+}
+
+.text-slate-600,
+.text-slate-500 {
+  color: #475569 !important;
+}
+
+.bg-slate-50 {
+  background-color: var(--surface-soft) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #1d5f84;
+}
+
+aside {
+  background: linear-gradient(180deg, var(--sidebar-bg) 0%, #0c5077 100%) !important;
+  border-right: 1px solid var(--sidebar-border) !important;
+}
+
+aside .text-slate-900,
+aside .text-slate-800,
+aside .text-slate-700 {
+  color: var(--sidebar-text) !important;
+}
+
+aside .text-slate-600,
+aside .text-slate-500 {
+  color: var(--sidebar-muted) !important;
+}
+
+aside a {
+  color: var(--sidebar-text) !important;
+}
+
+aside a:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+}
+
+header {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+input,
+select,
+textarea {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  color: #143a56;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8aa8bc;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }

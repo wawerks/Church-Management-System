@@ -147,7 +147,6 @@ export default async function EventsPage(props: {
                           </Link>
                           <form
                             action={deleteEventAction.bind(null, e.id)}
-                            method="post"
                           >
                             <SubmitButton
                               pendingLabel="Deleting…"

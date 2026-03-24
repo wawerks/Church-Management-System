@@ -72,15 +72,17 @@ export default async function ProtectedLayout({
   const session = await requireSession();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex">
+    <div className="app-shell h-screen overflow-hidden">
+      <div className="flex h-full">
         <Sidebar role={session.role} userName={session.name} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <MobileNav role={session.role} />
-          <header className="hidden border-b bg-white px-4 py-3 md:block">
+          <header className="hidden border-b border-slate-200/80 bg-white/90 px-6 py-4 backdrop-blur md:block">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold">Church Admin</div>
+                <div className="text-sm font-semibold tracking-tight text-slate-900">
+                  Church Admin
+                </div>
                 <div className="text-xs text-slate-600">{session.email}</div>
               </div>
               <div className="text-right">

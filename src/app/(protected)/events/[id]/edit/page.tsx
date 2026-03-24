@@ -53,7 +53,6 @@ export default async function EditEventPage(props: {
 
       <form
         action={updateEventAction.bind(null, event.id)}
-        method="post"
         className="space-y-5"
       >
         <label className="block">

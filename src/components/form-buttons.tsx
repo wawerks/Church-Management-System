@@ -44,7 +44,7 @@ export function SubmitButton({
       {...rest}
       disabled={isBusy}
       aria-busy={pending}
-      className={`${className} disabled:cursor-not-allowed disabled:opacity-60`.trim()}
+      className={`${className} active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60`.trim()}
     >
       {pending ? (
         <span className="inline-flex items-center justify-center gap-2">
@@ -105,7 +105,7 @@ export function GetSubmitButton({
       {...rest}
       disabled={isBusy}
       aria-busy={pending}
-      className={`${className} disabled:cursor-not-allowed disabled:opacity-60`.trim()}
+      className={`${className} active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60`.trim()}
     >
       {pending ? (
         <span className="inline-flex items-center justify-center gap-2">

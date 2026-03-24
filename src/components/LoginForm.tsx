@@ -43,7 +43,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
       <div className="mb-4">
         <div className="text-xl font-semibold">Church Management</div>
         <div className="mt-1 text-sm text-slate-600">
@@ -59,7 +59,7 @@ export function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
             autoComplete="email"
           />
         </label>
@@ -73,7 +73,7 @@ export function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
             autoComplete="current-password"
           />
         </label>
@@ -88,7 +88,7 @@ export function LoginForm() {
           type="submit"
           disabled={submitting}
           aria-busy={submitting}
-          className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? (
             <span className="inline-flex items-center justify-center gap-2">

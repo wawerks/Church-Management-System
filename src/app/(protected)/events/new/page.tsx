@@ -24,7 +24,7 @@ export default async function NewEventPage() {
         </Link>
       </div>
 
-      <form action={createEventAction} method="post" className="space-y-5">
+      <form action={createEventAction} className="space-y-5">
         <label className="block">
           <div className="mb-1 text-sm font-medium text-slate-700">Title</div>
           <input
