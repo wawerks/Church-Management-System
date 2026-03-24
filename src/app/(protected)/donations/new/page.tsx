@@ -2,10 +2,11 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createDonationAction } from "../actions";
+import { SubmitButton } from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
 
 export default async function NewDonationPage() {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   let members: Array<{ id: string; name: string }> = [];
   try {
@@ -27,7 +28,7 @@ export default async function NewDonationPage() {
         <div>
           <h1 className="text-2xl font-semibold">Add Donation</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Record tithes and other donations by member.
+            Record member donations separately from service income.
           </p>
         </div>
         <Link
@@ -40,7 +41,6 @@ export default async function NewDonationPage() {
 
       <form
         action={createDonationAction}
-        method="post"
         className="space-y-5"
       >
         <label className="block">
@@ -88,10 +88,9 @@ export default async function NewDonationPage() {
               name="type"
               required
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              defaultValue="TITHE"
+              defaultValue="DONATION"
             >
-              <option value="TITHE">Tithe</option>
-              <option value="OFFERING">Offering</option>
+              <option value="DONATION">Donation</option>
               <option value="OTHERS">Others</option>
             </select>
           </label>
@@ -114,12 +113,12 @@ export default async function NewDonationPage() {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="Saving…"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Donation
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

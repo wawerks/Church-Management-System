@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { updateEventAction } from "../../actions";
+import { SubmitButton } from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
 
 function toDateInputValue(d: Date) {
@@ -12,7 +13,7 @@ function toDateInputValue(d: Date) {
 export default async function EditEventPage(props: {
   params: { id: string };
 }) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN"] satisfies Role[]);
 
   const eventId = props.params.id;
 
@@ -94,12 +95,12 @@ export default async function EditEventPage(props: {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="Saving…"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Changes
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

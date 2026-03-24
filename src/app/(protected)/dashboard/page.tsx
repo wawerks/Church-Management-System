@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus } from "@/generated/prisma/enums";
+import { canViewDashboardDonations } from "@/lib/permissions";
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -28,8 +29,16 @@ function endOfMonth(d: Date) {
   return x;
 }
 
+function formatMoney(value: number) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export default async function DashboardPage() {
   const session = await requireSession();
+  const showDonations = canViewDashboardDonations(session.role);
   const today = new Date();
 
   let totalMembers = 0;
@@ -141,33 +150,24 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {session.role !== "STAFF" ? (
+        {showDonations ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-sm font-medium text-slate-600">
               Monthly Donations
             </div>
             <div className="mt-2 text-3xl font-semibold">
-              {monthlyDonations.toFixed(2)}
+              {formatMoney(monthlyDonations)}
             </div>
           </div>
-        ) : (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-medium text-slate-600">
-              Monthly Donations
-            </div>
-            <div className="mt-2 text-sm text-slate-500">
-              Restricted for Staff
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold">Recent Donations</div>
-          {session.role === "STAFF" ? (
+          {!showDonations ? (
             <div className="mt-2 text-sm text-slate-500">
-              Restricted for Staff
+              Not available for your role.
             </div>
           ) : (
             <div className="mt-3 space-y-2">
@@ -187,7 +187,9 @@ export default async function DashboardPage() {
                         {d.type} • {d.date.toLocaleDateString()}
                       </div>
                     </div>
-                    <div className="font-semibold">{d.amount}</div>
+                    <div className="font-semibold">
+                      {formatMoney(Number(d.amount))}
+                    </div>
                   </div>
                 ))
               )}

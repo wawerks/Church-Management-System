@@ -9,12 +9,12 @@ import type { Role } from "@/generated/prisma/enums";
 const DonationSchema = z.object({
   memberId: z.string().min(1),
   amount: z.coerce.number().positive(),
-  type: z.enum(["TITHE", "OFFERING", "OTHERS"]),
+  type: z.enum(["DONATION", "OTHERS"]),
   date: z.string().min(1),
 });
 
 export async function createDonationAction(formData: FormData) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   const parsed = DonationSchema.safeParse({
     memberId: (formData.get("memberId") ?? "") as string,
@@ -43,7 +43,7 @@ export async function createDonationAction(formData: FormData) {
 }
 
 export async function deleteDonationAction(donationId: string) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
   await prisma.donation.delete({ where: { id: donationId } });
   redirect("/donations");
 }

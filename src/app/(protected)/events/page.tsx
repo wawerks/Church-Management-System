@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
+import { canMutateEvents } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/enums";
 import { deleteEventAction } from "./actions";
+import {
+  GetSubmitButton,
+  PendingGetForm,
+  SubmitButton,
+} from "@/components/form-buttons";
 import type { Prisma } from "@/generated/prisma/client";
 
 function formatDate(d: Date) {
@@ -13,6 +19,8 @@ export default async function EventsPage(props: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  const session = await requireSession();
+  const canEdit = canMutateEvents(session.role);
 
   const qRaw = props.searchParams?.q;
   const q =
@@ -53,12 +61,14 @@ export default async function EventsPage(props: {
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Create services/events and manage attendance.
+            {canEdit
+              ? "Create services/events for attendance."
+              : "View scheduled services (Pastor: read-only)."}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <form method="GET" className="flex items-center gap-2">
+          <PendingGetForm method="GET" className="flex items-center gap-2">
             <input
               type="search"
               name="q"
@@ -66,19 +76,21 @@ export default async function EventsPage(props: {
               placeholder="Search events..."
               className="w-56 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
             />
-            <button
-              type="submit"
+            <GetSubmitButton
+              pendingLabel="Searching…"
               className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
             >
               Search
-            </button>
-          </form>
-          <Link
-            href="/events/new"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            + Add Event
-          </Link>
+            </GetSubmitButton>
+          </PendingGetForm>
+          {canEdit ? (
+            <Link
+              href="/events/new"
+              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
+            >
+              + Add Event
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -95,13 +107,18 @@ export default async function EventsPage(props: {
               <tr className="text-left text-slate-700">
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
+                {canEdit ? (
+                  <th className="px-4 py-3 font-medium">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               {events.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                  <td
+                    colSpan={canEdit ? 3 : 2}
+                    className="px-4 py-6 text-center text-slate-500"
+                  >
                     No events found.
                   </td>
                 </tr>
@@ -119,27 +136,29 @@ export default async function EventsPage(props: {
                     <td className="px-4 py-3 text-slate-600">
                       {formatDate(e.date)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/events/${e.id}/edit`}
-                          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          Edit
-                        </Link>
-                        <form
-                          action={deleteEventAction.bind(null, e.id)}
-                          method="post"
-                        >
-                          <button
-                            type="submit"
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    {canEdit ? (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/events/${e.id}/edit`}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                           >
-                            Delete
-                          </button>
-                        </form>
-                      </div>
-                    </td>
+                            Edit
+                          </Link>
+                          <form
+                            action={deleteEventAction.bind(null, e.id)}
+                            method="post"
+                          >
+                            <SubmitButton
+                              pendingLabel="Deleting…"
+                              className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                            >
+                              Delete
+                            </SubmitButton>
+                          </form>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}

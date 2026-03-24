@@ -1,71 +1,71 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
-import { createEventAction } from "../actions";
+import { createServiceIncomeAction } from "../actions";
 import { SubmitButton } from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
-import Link from "next/link";
 
-export default async function NewEventPage() {
-  await requireRole(["ADMIN"] satisfies Role[]);
+export default async function NewServiceIncomePage() {
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-2xl">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Add Event</h1>
+          <h1 className="text-2xl font-semibold">Add Tithes & Offering</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Create a service date/event for attendance tracking.
+            Record the total income for a Sunday service date.
           </p>
         </div>
         <Link
-          href="/events"
+          href="/tithes-offering"
           className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Back
         </Link>
       </div>
 
-      <form action={createEventAction} method="post" className="space-y-5">
-        <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">Title</div>
-          <input
-            name="title"
-            required
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            placeholder="e.g., Sunday Service"
-          />
-        </label>
-
+      <form action={createServiceIncomeAction} className="space-y-5">
         <label className="block">
           <div className="mb-1 text-sm font-medium text-slate-700">
-            Description (optional)
+            Sunday Service Date
           </div>
-          <textarea
-            name="description"
-            className="min-h-[90px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            placeholder="Optional notes for staff"
-          />
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">Date</div>
           <input
-            name="date"
+            name="serviceDate"
             type="date"
             required
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
           />
         </label>
 
-        <div className="flex justify-end">
+        <label className="block">
+          <div className="mb-1 text-sm font-medium text-slate-700">
+            Total Tithes & Offering
+          </div>
+          <input
+            name="amount"
+            required
+            type="number"
+            step="0.01"
+            min="0"
+            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+        </label>
+
+        <div className="flex justify-end gap-2">
+          <Link
+            href="/tithes-offering"
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </Link>
           <SubmitButton
-            pendingLabel="Saving…"
+            pendingLabel="Saving..."
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
-            Save Event
+            Save
           </SubmitButton>
         </div>
       </form>
     </div>
   );
 }
-

@@ -1,0 +1,120 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type FormHTMLAttributes,
+} from "react";
+import { useFormStatus } from "react-dom";
+
+export function InlineSpinner({ className }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent ${className ?? ""}`}
+      aria-hidden
+    />
+  );
+}
+
+type SubmitButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> & {
+  pendingLabel?: string;
+};
+
+/**
+ * Submit button for forms using Next.js Server Actions.
+ * Disables and shows a spinner while the action runs (prevents double submit).
+ */
+export function SubmitButton({
+  children,
+  pendingLabel = "Please wait…",
+  className = "",
+  disabled,
+  ...rest
+}: SubmitButtonProps) {
+  const { pending } = useFormStatus();
+  const isBusy = Boolean(pending || disabled);
+  return (
+    <button
+      type="submit"
+      {...rest}
+      disabled={isBusy}
+      aria-busy={pending}
+      className={`${className} disabled:cursor-not-allowed disabled:opacity-60`.trim()}
+    >
+      {pending ? (
+        <span className="inline-flex items-center justify-center gap-2">
+          <InlineSpinner />
+          <span>{pendingLabel}</span>
+        </span>
+      ) : (
+        children
+      )}
+    </button>
+  );
+}
+
+const GetFormPendingContext = createContext(false);
+
+type PendingGetFormProps = Omit<
+  FormHTMLAttributes<HTMLFormElement>,
+  "onSubmit"
+>;
+
+/**
+ * Wraps a GET form so submit buttons can show pending state until navigation completes.
+ */
+export function PendingGetForm({ children, ...rest }: PendingGetFormProps) {
+  const [pending, setPending] = useState(false);
+  const handleSubmit = useCallback(() => {
+    setPending(true);
+  }, []);
+  return (
+    <GetFormPendingContext.Provider value={pending}>
+      <form {...rest} onSubmit={handleSubmit}>
+        {children}
+      </form>
+    </GetFormPendingContext.Provider>
+  );
+}
+
+type GetSubmitButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> & {
+  pendingLabel?: string;
+};
+
+/** Submit button for GET forms wrapped in {@link PendingGetForm}. */
+export function GetSubmitButton({
+  children,
+  pendingLabel = "Please wait…",
+  className = "",
+  disabled,
+  ...rest
+}: GetSubmitButtonProps) {
+  const pending = useContext(GetFormPendingContext);
+  const isBusy = Boolean(pending || disabled);
+  return (
+    <button
+      type="submit"
+      {...rest}
+      disabled={isBusy}
+      aria-busy={pending}
+      className={`${className} disabled:cursor-not-allowed disabled:opacity-60`.trim()}
+    >
+      {pending ? (
+        <span className="inline-flex items-center justify-center gap-2">
+          <InlineSpinner />
+          <span>{pendingLabel}</span>
+        </span>
+      ) : (
+        children
+      )}
+    </button>
+  );
+}

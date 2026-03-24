@@ -24,7 +24,7 @@ function emptyToUndefined(v: string | undefined) {
 }
 
 export async function createMemberAction(formData: FormData) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   const parsed = MemberSchema.safeParse({
     firstName: (formData.get("firstName") ?? "") as string,
@@ -83,7 +83,7 @@ export async function updateMemberAction(
   memberId: string,
   formData: FormData,
 ) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   const parsed = MemberSchema.safeParse({
     firstName: (formData.get("firstName") ?? "") as string,
@@ -139,7 +139,7 @@ export async function updateMemberAction(
 }
 
 export async function deleteMemberAction(memberId: string) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
   await prisma.member.delete({ where: { id: memberId } });
   redirect("/members");
 }

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { canMutateMembers } from "@/lib/permissions";
 import { updateMemberAction } from "../../actions";
-import type { Role } from "@/generated/prisma/enums";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { SubmitButton } from "@/components/form-buttons";
 
 function toDateInputValue(d: Date | null | undefined) {
   if (!d) return "";
@@ -14,7 +17,8 @@ function toDateInputValue(d: Date | null | undefined) {
 export default async function EditMemberPage(props: {
   params: { id: string };
 }) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  const session = await requireSession();
+  if (!canMutateMembers(session.role)) redirect("/members");
 
   const { id } = props.params;
 
@@ -137,7 +141,7 @@ export default async function EditMemberPage(props: {
 
         <label className="block">
           <div className="mb-1 text-sm font-medium text-slate-700">Address</div>
-          <input
+          <AddressAutocomplete
             name="address"
             defaultValue={member.address ?? ""}
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -191,12 +195,12 @@ export default async function EditMemberPage(props: {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="Saving…"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Changes
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

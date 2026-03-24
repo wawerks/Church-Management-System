@@ -13,7 +13,7 @@ const EventSchema = z.object({
 });
 
 export async function createEventAction(formData: FormData) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN"] satisfies Role[]);
 
   const parsed = EventSchema.safeParse({
     title: (formData.get("title") ?? "") as string,
@@ -38,7 +38,7 @@ export async function createEventAction(formData: FormData) {
 }
 
 export async function updateEventAction(eventId: string, formData: FormData) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN"] satisfies Role[]);
 
   const parsed = EventSchema.safeParse({
     title: (formData.get("title") ?? "") as string,
@@ -64,7 +64,7 @@ export async function updateEventAction(eventId: string, formData: FormData) {
 }
 
 export async function deleteEventAction(eventId: string) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN"] satisfies Role[]);
   await prisma.event.delete({ where: { id: eventId } });
   redirect("/events");
 }

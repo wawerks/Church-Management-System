@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { InlineSpinner } from "@/components/form-buttons";
 
 type MemberRow = { id: string; firstName: string; lastName: string };
 type EventRow = { id: string; title: string; date: string | Date };
@@ -12,6 +13,8 @@ export function AttendanceMarkForm(props: {
   selectedEventId: string | null;
   members: MemberRow[];
   initialStatuses: Record<string, Status | undefined>;
+  /** Pastor / view-only: show roster but no saving */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
 
@@ -41,9 +44,12 @@ export function AttendanceMarkForm(props: {
   const [message, setMessage] = useState<string | null>(null);
 
   const eventOptions = useMemo(() => props.events, [props.events]);
+  const hasEvents = eventOptions.length > 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (props.readOnly) return;
+    if (saving) return;
     if (!eventId) return;
 
     setSaving(true);
@@ -78,32 +84,54 @@ export function AttendanceMarkForm(props: {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {props.readOnly ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <strong>View only.</strong> Pastors can review attendance but cannot
+          change or save it.
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">Service</div>
+          <div className="mb-1 text-sm font-medium text-slate-700">
+            Service date
+          </div>
           <select
             value={eventId ?? ""}
+            disabled={!hasEvents || saving}
             onChange={(e) => {
               const next = e.target.value;
               setEventId(next);
               router.push(`/attendance?eventId=${encodeURIComponent(next)}`);
             }}
-            className="w-72 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="w-72 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm disabled:opacity-60"
           >
+            {!hasEvents ? (
+              <option value="">No services available yet</option>
+            ) : null}
             {eventOptions.map((ev) => (
               <option key={ev.id} value={ev.id}>
-                {ev.title} ({new Date(ev.date).toLocaleDateString()})
+                {new Date(ev.date).toLocaleDateString()} - {ev.title}
               </option>
             ))}
           </select>
         </label>
-        <button
-          type="submit"
-          disabled={saving || !eventId}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save Attendance"}
-        </button>
+        {!props.readOnly ? (
+          <button
+            type="submit"
+            disabled={saving || !eventId}
+            aria-busy={saving}
+            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <InlineSpinner />
+                Saving…
+              </span>
+            ) : (
+              "Save Attendance"
+            )}
+          </button>
+        ) : null}
       </div>
 
       {props.members.length === 0 ? (
@@ -135,6 +163,7 @@ export function AttendanceMarkForm(props: {
                         type="radio"
                         name={`status-${m.id}`}
                         checked={current === "PRESENT"}
+                        disabled={props.readOnly || saving}
                         onChange={() =>
                           setStatuses((prev) => ({
                             ...prev,
@@ -151,6 +180,7 @@ export function AttendanceMarkForm(props: {
                         type="radio"
                         name={`status-${m.id}`}
                         checked={current === "ABSENT"}
+                        disabled={props.readOnly || saving}
                         onChange={() =>
                           setStatuses((prev) => ({
                             ...prev,

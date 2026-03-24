@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { InlineSpinner } from "@/components/form-buttons";
 
 export function LoginForm() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export function LoginForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
     setSubmitting(true);
 
@@ -85,9 +87,17 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:opacity-60"
+          aria-busy={submitting}
+          className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Signing in..." : "Sign in"}
+          {submitting ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <InlineSpinner />
+              Signing in…
+            </span>
+          ) : (
+            "Sign in"
+          )}
         </button>
       </form>
     </div>

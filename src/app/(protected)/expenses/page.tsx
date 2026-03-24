@@ -2,14 +2,14 @@ import Link from "next/link";
 import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { Role, DonationType } from "@/generated/prisma/enums";
-import { deleteDonationAction } from "./actions";
+import type { Prisma } from "@/generated/prisma/client";
+import type { Role } from "@/generated/prisma/enums";
 import {
   GetSubmitButton,
   PendingGetForm,
   SubmitButton,
 } from "@/components/form-buttons";
-import type { Prisma } from "@/generated/prisma/client";
+import { deleteExpenseAction } from "./actions";
 
 function parseDateInput(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -31,20 +31,6 @@ function endOfDay(d: Date) {
   return x;
 }
 
-function startOfMonth(d: Date) {
-  const x = new Date(d);
-  x.setDate(1);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function endOfMonth(d: Date) {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + 1, 0);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
-
 function formatMoney(value: number) {
   return value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -52,27 +38,33 @@ function formatMoney(value: number) {
   });
 }
 
-export default async function DonationsPage(props: {
+export default async function ExpensesPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
   const searchParams = await props.searchParams;
+  const isAdmin = session.role === "ADMIN";
 
-  const today = new Date();
+  let expenseTypes: Array<{ id: string; name: string }> = [];
+  try {
+    expenseTypes = await prisma.expenseType.findMany({ orderBy: { name: "asc" } });
+  } catch {
+    // ignore
+  }
+  const expenseTypeNames = expenseTypes.map((t) => t.name);
 
   const typeRaw = searchParams?.type;
   const type =
-    typeof typeRaw === "string" &&
-    ["DONATION", "OTHERS"].includes(typeRaw)
-      ? (typeRaw as DonationType)
+    typeof typeRaw === "string" && expenseTypeNames.includes(typeRaw)
+      ? typeRaw
       : undefined;
 
   const from = parseDateInput(searchParams?.from);
   const to = parseDateInput(searchParams?.to);
 
-  let where: Prisma.DonationWhereInput = {};
+  let where: Prisma.ExpenseWhereInput = {};
   if (type) where = { ...where, type };
   if (from || to) {
     where = {
@@ -85,70 +77,36 @@ export default async function DonationsPage(props: {
   }
 
   let dbReady = true;
-  let donations:
-    | Array<{
-        id: string;
-        amount: string;
-        type: string;
-        date: Date;
-        memberName: string;
-      }>
-    | [] = [];
-  let totalInRange = 0;
-  let todayTotal = 0;
-  let monthTotal = 0;
-  let breakdown:
-    | Array<{ type: DonationType; amount: string }>
-    | [] = [];
+  let rows: Array<{
+    id: string;
+    type: string;
+    claimedBy: string;
+    date: Date;
+    amount: string;
+  }> = [];
+  let total = 0;
 
   try {
-    const [list, sumRange, sumToday, sumMonth] =
-      await Promise.all([
-      prisma.donation.findMany({
+    const [list, agg] = await Promise.all([
+      prisma.expense.findMany({
         where,
         orderBy: { date: "desc" },
-        take: 50,
-        include: { member: true },
+        take: 100,
       }),
-      prisma.donation.aggregate({
+      prisma.expense.aggregate({
         _sum: { amount: true },
         where,
-      }),
-      prisma.donation.aggregate({
-        _sum: { amount: true },
-        where: { ...where, date: { gte: startOfDay(today), lte: endOfDay(today) } },
-      }),
-      prisma.donation.aggregate({
-        _sum: { amount: true },
-        where: {
-          ...where,
-          date: { gte: startOfMonth(today), lte: endOfMonth(today) },
-        },
       }),
     ]);
 
-    donations = list.map((d) => ({
-      id: d.id,
-      amount: d.amount.toString(),
-      type: d.type,
-      date: d.date,
-      memberName: `${d.member.firstName} ${d.member.lastName}`,
+    rows = list.map((r) => ({
+      id: r.id,
+      type: r.type,
+      claimedBy: r.claimedBy,
+      date: r.date,
+      amount: r.amount.toString(),
     }));
-    totalInRange = Number(sumRange._sum.amount ?? 0);
-    todayTotal = Number(sumToday._sum.amount ?? 0);
-    monthTotal = Number(sumMonth._sum.amount ?? 0);
-
-    // Simple breakdown by donation type within filters/date range.
-    const types: DonationType[] = ["DONATION", "OTHERS"];
-    breakdown = await Promise.all(
-      types.map(async (t) => {
-        const agg = await prisma.donation.aggregate({
-          _sum: { amount: true },
-          where: { ...where, type: t },
-        });
-        return { type: t, amount: (agg._sum.amount ?? 0).toString() };
-      }),
-    );
+    total = Number(agg._sum.amount ?? 0);
   } catch {
     dbReady = false;
   }
@@ -157,20 +115,28 @@ export default async function DonationsPage(props: {
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Donations</h1>
+          <h1 className="text-2xl font-semibold">Expenses</h1>
           <p className="mt-1 text-sm text-slate-600">
-            {canEdit
-              ? "Track member donations and other donation entries."
-              : "View donations (Pastor: read-only)."}
+            Track church expenses and review all expense transactions.
           </p>
         </div>
         {canEdit ? (
-          <Link
-            href="/donations/new"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            + Add Donation
-          </Link>
+          <div className="flex gap-2">
+            {isAdmin ? (
+              <Link
+                href="/expenses/types"
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Manage Expense Types
+              </Link>
+            ) : null}
+            <Link
+              href="/expenses/new"
+              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
+            >
+              + Add Expense
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -184,8 +150,11 @@ export default async function DonationsPage(props: {
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">All types</option>
-              <option value="DONATION">Donation</option>
-              <option value="OTHERS">Others</option>
+              {expenseTypes.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -196,7 +165,7 @@ export default async function DonationsPage(props: {
               name="from"
               defaultValue={
                 typeof searchParams?.from === "string"
-                  ? searchParams?.from
+                  ? searchParams.from
                   : undefined
               }
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -209,9 +178,7 @@ export default async function DonationsPage(props: {
               type="date"
               name="to"
               defaultValue={
-                typeof searchParams?.to === "string"
-                  ? searchParams?.to
-                  : undefined
+                typeof searchParams?.to === "string" ? searchParams.to : undefined
               }
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
             />
@@ -219,13 +186,13 @@ export default async function DonationsPage(props: {
 
           <div className="flex items-end gap-2">
             <GetSubmitButton
-              pendingLabel="Applying…"
+              pendingLabel="Applying..."
               className="h-10 rounded-md bg-black px-3 text-sm font-medium text-white hover:bg-black/90"
             >
               Apply
             </GetSubmitButton>
             <Link
-              href="/donations"
+              href="/expenses"
               className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center"
             >
               Reset
@@ -236,51 +203,18 @@ export default async function DonationsPage(props: {
 
       {!dbReady ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Database isn’t ready yet. Set up MySQL + run Prisma migrations.
+          Database isn&apos;t ready yet. Set up MySQL + run Prisma migrations.
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-1">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-medium text-slate-600">
-            Total (Filtered Range)
+            Total Expenses (Filtered)
           </div>
           <div className="mt-2 text-3xl font-semibold">
-            {dbReady ? formatMoney(totalInRange) : "—"}
+            {dbReady ? formatMoney(total) : "-"}
           </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">Today</div>
-          <div className="mt-2 text-3xl font-semibold">
-            {dbReady ? formatMoney(todayTotal) : "—"}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">This Month</div>
-          <div className="mt-2 text-3xl font-semibold">
-            {dbReady ? formatMoney(monthTotal) : "—"}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 text-sm font-semibold text-slate-800">
-          Breakdown
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          {breakdown.map((b) => (
-            <div
-              key={b.type}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-            >
-              <div className="text-xs font-medium text-slate-600">
-                {b.type}
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {dbReady ? formatMoney(Number(b.amount)) : "—"}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -289,43 +223,41 @@ export default async function DonationsPage(props: {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr className="text-left text-slate-700">
-                <th className="px-4 py-3 font-medium">Member</th>
                 <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Claimed By</th>
                 <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Amount</th>
                 {canEdit ? (
                   <th className="px-4 py-3 font-medium">Actions</th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
-              {donations.length === 0 ? (
+              {rows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={canEdit ? 5 : 4}
                     className="px-4 py-6 text-center text-slate-500"
                   >
-                    No donations found.
+                    No expense transactions found.
                   </td>
                 </tr>
               ) : (
-                donations.map((d) => (
-                  <tr key={d.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 font-medium">{d.memberName}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.type}</td>
-                    <td className="px-4 py-3 font-semibold">
-                      {formatMoney(Number(d.amount))}
-                    </td>
+                rows.map((r) => (
+                  <tr key={r.id} className="border-t border-slate-100">
+                    <td className="px-4 py-3">{r.type}</td>
+                    <td className="px-4 py-3">{r.claimedBy}</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {d.date.toLocaleDateString()}
+                      {r.date.toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      {formatMoney(Number(r.amount))}
                     </td>
                     {canEdit ? (
                       <td className="px-4 py-3">
-                        <form
-                          action={deleteDonationAction.bind(null, d.id)}
-                        >
+                        <form action={deleteExpenseAction.bind(null, r.id)}>
                           <SubmitButton
-                            pendingLabel="Deleting…"
+                            pendingLabel="Deleting..."
                             className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
                           >
                             Delete
@@ -343,4 +275,3 @@ export default async function DonationsPage(props: {
     </div>
   );
 }
-

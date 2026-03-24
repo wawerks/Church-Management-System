@@ -28,8 +28,7 @@ enum AttendanceStatus {
 }
 
 enum DonationType {
-  TITHE
-  OFFERING
+  DONATION
   OTHERS
 }
 
@@ -116,4 +115,36 @@ model Donation {
   member Member @relation(fields: [memberId], references: [id])
 
   @@index([type, date])
+}
+
+model ServiceIncome {
+  id          String   @id @default(cuid())
+  serviceDate DateTime @unique
+  amount      Decimal  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceDate])
+}
+
+model Expense {
+  id     String   @id @default(cuid())
+  type   String
+  claimedBy String   @default("Unknown")
+  date   DateTime
+  amount Decimal  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, date])
+}
+
+model ExpenseType {
+  id   String @id @default(cuid())
+  name String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

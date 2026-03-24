@@ -1,8 +1,10 @@
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
+import { canMarkAttendance } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
 import { AttendanceStatus } from "@/generated/prisma/enums";
 import { AttendanceMarkForm } from "@/components/AttendanceMarkForm";
+import Link from "next/link";
 
 type Status = "PRESENT" | "ABSENT";
 
@@ -16,6 +18,8 @@ export default async function AttendancePage(props: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  const session = await requireSession();
+  const canMark = canMarkAttendance(session.role);
 
   const eventIdRaw = props.searchParams?.eventId;
   const eventId =
@@ -110,7 +114,9 @@ export default async function AttendancePage(props: {
         <div>
           <h1 className="text-2xl font-semibold">Attendance</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Mark presence per service/event.
+            {canMark
+              ? "Mark presence per service/event."
+              : "Review attendance (view only)."}
           </p>
         </div>
 
@@ -132,6 +138,15 @@ export default async function AttendancePage(props: {
           Database isn’t ready yet. Set up MySQL + run Prisma migrations.
         </div>
       ) : null}
+      {dbReady && events.length === 0 ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          No service dates found yet. Create one in{" "}
+          <Link href="/events" className="underline hover:no-underline">
+            Events
+          </Link>{" "}
+          so you can select it here for attendance.
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <AttendanceMarkForm
@@ -139,6 +154,7 @@ export default async function AttendancePage(props: {
           selectedEventId={selectedId}
           members={members}
           initialStatuses={attendanceMap}
+          readOnly={!canMark}
         />
       </div>
 

@@ -1,11 +1,15 @@
-import { requireRole } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { canMutateMembers } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { createMemberAction } from "../actions";
-import type { Role } from "@/generated/prisma/enums";
 import Link from "next/link";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { SubmitButton } from "@/components/form-buttons";
 
 export default async function NewMemberPage() {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  const session = await requireSession();
+  if (!canMutateMembers(session.role)) redirect("/members");
 
   let familyGroups: Array<{ id: string; familyName: string }> = [];
   try {
@@ -92,7 +96,7 @@ export default async function NewMemberPage() {
 
         <label className="block">
           <div className="mb-1 text-sm font-medium text-slate-700">Address</div>
-          <input
+          <AddressAutocomplete
             name="address"
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
           />
@@ -145,12 +149,12 @@ export default async function NewMemberPage() {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="Saving…"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Member
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

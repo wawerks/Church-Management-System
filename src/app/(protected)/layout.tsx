@@ -3,17 +3,38 @@ import { requireSession } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { LogoutButton } from "@/components/LogoutButton";
 import type { Role } from "@/generated/prisma/enums";
+import { canManageUsers } from "@/lib/permissions";
 
 function MobileNav(props: { role: Role }) {
   const role = props.role;
   const items: Array<{ href: string; label: string; roles?: Role[] }> = [
     { href: "/dashboard", label: "Dashboard" },
+    ...(canManageUsers(role)
+      ? [{ href: "/users", label: "Users" as const }]
+      : []),
     { href: "/members", label: "Members", roles: ["ADMIN", "PASTOR", "STAFF"] },
     { href: "/attendance", label: "Attendance", roles: ["ADMIN", "PASTOR", "STAFF"] },
-    { href: "/donations", label: "Donations", roles: ["ADMIN", "PASTOR"] },
+    {
+      href: "/tithes-offering",
+      label: "Tithes & Offering",
+      roles: ["ADMIN", "PASTOR", "STAFF"],
+    },
+    { href: "/donations", label: "Donations", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    { href: "/expenses", label: "Expenses", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    ...(canManageUsers(role)
+      ? [{ href: "/expenses/types", label: "Expense Types", roles: ["ADMIN"] as Role[] }]
+      : []),
     { href: "/events", label: "Events", roles: ["ADMIN", "PASTOR"] },
-    { href: "/reports/financial", label: "Financial Reports", roles: ["ADMIN", "PASTOR"] },
-    { href: "/reports/attendance", label: "Attendance Reports", roles: ["ADMIN", "PASTOR"] },
+    {
+      href: "/reports/financial",
+      label: "Fin. Reports",
+      roles: ["ADMIN", "PASTOR", "STAFF"],
+    },
+    {
+      href: "/reports/attendance",
+      label: "Att. Reports",
+      roles: ["ADMIN", "PASTOR", "STAFF"],
+    },
   ];
 
   return (

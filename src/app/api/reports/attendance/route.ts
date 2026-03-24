@@ -17,8 +17,9 @@ import { AttendanceStatus as AttendanceStatusEnum } from "@/generated/prisma/enu
 
 type Format = "xlsx" | "pdf" | "docx";
 
+/** Exports: Admin + Staff only (Pastor is view-only on report pages). */
 function isAllowedRole(role: string): role is Role {
-  return role === "ADMIN" || role === "PASTOR";
+  return role === "ADMIN" || role === "STAFF";
 }
 
 function toInputDate(value: string | null) {

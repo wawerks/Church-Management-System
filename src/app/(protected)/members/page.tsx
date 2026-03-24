@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
+import { canMutateMembers } from "@/lib/permissions";
 import { deleteMemberAction } from "./actions";
+import {
+  GetSubmitButton,
+  PendingGetForm,
+  SubmitButton,
+} from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -9,6 +15,8 @@ export default async function MembersPage(props: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  const session = await requireSession();
+  const canEdit = canMutateMembers(session.role);
 
   const qRaw = props.searchParams?.q;
   const q =
@@ -70,12 +78,14 @@ export default async function MembersPage(props: {
         <div>
           <h1 className="text-2xl font-semibold">Members</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Add, edit, delete, and search members.
+            {canEdit
+              ? "Add, edit, delete, and search members."
+              : "View members (Pastor: read-only)."}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <form method="GET" className="flex items-center gap-2">
+          <PendingGetForm method="GET" className="flex items-center gap-2">
             <input
               type="search"
               name="q"
@@ -83,19 +93,21 @@ export default async function MembersPage(props: {
               placeholder="Search by name..."
               className="w-56 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
             />
-            <button
-              type="submit"
+            <GetSubmitButton
+              pendingLabel="Searching…"
               className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
             >
               Search
-            </button>
-          </form>
-          <Link
-            href="/members/new"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            + Add Member
-          </Link>
+            </GetSubmitButton>
+          </PendingGetForm>
+          {canEdit ? (
+            <Link
+              href="/members/new"
+              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
+            >
+              + Add Member
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -114,13 +126,18 @@ export default async function MembersPage(props: {
                 <th className="px-4 py-3 font-medium">Gender</th>
                 <th className="px-4 py-3 font-medium">Family</th>
                 <th className="px-4 py-3 font-medium">Contact</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
+                {canEdit ? (
+                  <th className="px-4 py-3 font-medium">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               {members.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                  <td
+                    colSpan={canEdit ? 5 : 4}
+                    className="px-4 py-6 text-center text-slate-500"
+                  >
                     No members found.
                   </td>
                 </tr>
@@ -139,28 +156,30 @@ export default async function MembersPage(props: {
                     <td className="px-4 py-3 text-slate-600">
                       {m.contactNumber ?? "—"}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/members/${m.id}/edit`}
-                          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          Edit
-                        </Link>
-
-                        <form
-                          action={deleteMemberAction.bind(null, m.id)}
-                          method="post"
-                        >
-                          <button
-                            type="submit"
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    {canEdit ? (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/members/${m.id}/edit`}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                           >
-                            Delete
-                          </button>
-                        </form>
-                      </div>
-                    </td>
+                            Edit
+                          </Link>
+
+                          <form
+                            action={deleteMemberAction.bind(null, m.id)}
+                            method="post"
+                          >
+                            <SubmitButton
+                              pendingLabel="Deleting…"
+                              className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                            >
+                              Delete
+                            </SubmitButton>
+                          </form>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}

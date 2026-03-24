@@ -52,8 +52,16 @@ function labelFor(key: string, groupBy: GroupBy) {
   return key;
 }
 
+function formatMoney(value: number) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Exports: Admin + Staff only (Pastor is view-only on report pages). */
 function isAllowedRole(role: string): role is Role {
-  return role === "ADMIN" || role === "PASTOR";
+  return role === "ADMIN" || role === "STAFF";
 }
 
 async function financialData(params: URLSearchParams) {
@@ -79,7 +87,12 @@ async function financialData(params: URLSearchParams) {
 
   const donations = await prisma.donation.findMany({
     where: { date: { gte: start, lte: end } },
-    select: { date: true, amount: true, type: true },
+    select: { date: true, amount: true },
+  });
+
+  const serviceIncome = await prisma.serviceIncome.findMany({
+    where: { serviceDate: { gte: start, lte: end } },
+    select: { serviceDate: true, amount: true },
   });
 
   const byKey: Record<
@@ -87,9 +100,8 @@ async function financialData(params: URLSearchParams) {
     {
       key: string;
       total: number;
-      TITHE: number;
-      OFFERING: number;
-      OTHERS: number;
+      serviceIncome: number;
+      donations: number;
     }
   > = {};
 
@@ -99,16 +111,28 @@ async function financialData(params: URLSearchParams) {
       byKey[k] = {
         key: k,
         total: 0,
-        TITHE: 0,
-        OFFERING: 0,
-        OTHERS: 0,
+        serviceIncome: 0,
+        donations: 0,
       };
     }
     const amt = Number(d.amount ?? 0);
     byKey[k].total += amt;
-    if (d.type === "TITHE") byKey[k].TITHE += amt;
-    else if (d.type === "OFFERING") byKey[k].OFFERING += amt;
-    else byKey[k].OTHERS += amt;
+    byKey[k].donations += amt;
+  }
+
+  for (const s of serviceIncome) {
+    const k = keyFor(s.serviceDate, groupBy);
+    if (!byKey[k]) {
+      byKey[k] = {
+        key: k,
+        total: 0,
+        serviceIncome: 0,
+        donations: 0,
+      };
+    }
+    const amt = Number(s.amount ?? 0);
+    byKey[k].total += amt;
+    byKey[k].serviceIncome += amt;
   }
 
   const rows = Object.values(byKey).sort((a, b) =>
@@ -139,20 +163,21 @@ export async function GET(req: Request) {
       ws.columns = [
         { header: "Period", key: "period", width: 20 },
         { header: "Total", key: "total", width: 14 },
-        { header: "Tithe", key: "tithe", width: 14 },
-        { header: "Offering", key: "offering", width: 14 },
-        { header: "Others", key: "others", width: 14 },
+        { header: "Tithes & Offering", key: "serviceIncome", width: 18 },
+        { header: "Donations", key: "donations", width: 14 },
       ];
 
       ws.getRow(1).font = { bold: true };
       for (const r of data.rows) {
-        ws.addRow({
+        const row = ws.addRow({
           period: labelFor(r.key, data.groupBy),
           total: r.total,
-          tithe: r.TITHE,
-          offering: r.OFFERING,
-          others: r.OTHERS,
+          serviceIncome: r.serviceIncome,
+          donations: r.donations,
         });
+        row.getCell("total").numFmt = "#,##0.00";
+        row.getCell("serviceIncome").numFmt = "#,##0.00";
+        row.getCell("donations").numFmt = "#,##0.00";
       }
 
       const buffer = await wb.xlsx.writeBuffer();
@@ -180,15 +205,13 @@ export async function GET(req: Request) {
 
       let y = 740;
       page.drawText(
-        "Period | Total | Tithe | Offering | Others",
+        "Period | Total | Tithes & Offering | Donations",
         { x: 50, y, size: 10, font },
       );
       y -= 18;
 
       for (const r of data.rows) {
-        const line = `${r.key} | ${r.total.toFixed(2)} | ${r.TITHE.toFixed(
-          2,
-        )} | ${r.OFFERING.toFixed(2)} | ${r.OTHERS.toFixed(2)}`;
+        const line = `${r.key} | ${formatMoney(r.total)} | ${formatMoney(r.serviceIncome)} | ${formatMoney(r.donations)}`;
         page.drawText(line, { x: 50, y, size: 9, font });
         y -= 14;
         if (y < 60) break;
@@ -219,15 +242,16 @@ export async function GET(req: Request) {
             new Paragraph({ text: "" }),
             new Table({
               width: { size: 100, type: "pct" },
-              columnWidths: [1600, 1200, 1200, 1200, 1200],
+              columnWidths: [1800, 1200, 1800, 1200],
               rows: [
                 new TableRow({
                   children: [
                     new TableCell({ children: [new Paragraph("Period")] }),
                     new TableCell({ children: [new Paragraph("Total")] }),
-                    new TableCell({ children: [new Paragraph("Tithe")] }),
-                    new TableCell({ children: [new Paragraph("Offering")] }),
-                    new TableCell({ children: [new Paragraph("Others")] }),
+                    new TableCell({
+                      children: [new Paragraph("Tithes & Offering")],
+                    }),
+                    new TableCell({ children: [new Paragraph("Donations")] }),
                   ],
                 }),
                 ...data.rows.map(
@@ -238,16 +262,13 @@ export async function GET(req: Request) {
                           children: [new Paragraph(labelFor(r.key, data.groupBy))],
                         }),
                         new TableCell({
-                          children: [new Paragraph(r.total.toFixed(2))],
+                          children: [new Paragraph(formatMoney(r.total))],
                         }),
                         new TableCell({
-                          children: [new Paragraph(r.TITHE.toFixed(2))],
+                          children: [new Paragraph(formatMoney(r.serviceIncome))],
                         }),
                         new TableCell({
-                          children: [new Paragraph(r.OFFERING.toFixed(2))],
-                        }),
-                        new TableCell({
-                          children: [new Paragraph(r.OTHERS.toFixed(2))],
+                          children: [new Paragraph(formatMoney(r.donations))],
                         }),
                       ],
                     }),
