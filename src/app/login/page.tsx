@@ -7,10 +7,8 @@ export default async function LoginPage() {
   if (session) redirect("/dashboard");
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="flex items-center justify-center">
-        <LoginForm />
-      </div>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <LoginForm />
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -12,7 +13,7 @@ const ServiceIncomeSchema = z.object({
 });
 
 export async function createServiceIncomeAction(formData: FormData) {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
 
   const parsed = ServiceIncomeSchema.safeParse({
     serviceDate: (formData.get("serviceDate") ?? "") as string,
@@ -29,17 +30,32 @@ export async function createServiceIncomeAction(formData: FormData) {
     throw new Error("Invalid service date");
   }
 
-  await prisma.serviceIncome.upsert({
+  const entry = await prisma.serviceIncome.upsert({
     where: { serviceDate: date },
     update: { amount },
     create: { serviceDate: date, amount },
+  });
+  await logAction({
+    action: "UPSERT",
+    entity: "ServiceIncome",
+    entityId: entry.id,
+    details: { serviceDate: entry.serviceDate.toISOString(), amount: Number(entry.amount) },
   });
 
   redirect("/tithes-offering");
 }
 
 export async function deleteServiceIncomeAction(id: string) {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
-  await prisma.serviceIncome.delete({ where: { id } });
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
+  const deleted = await prisma.serviceIncome.delete({
+    where: { id },
+    select: { id: true, serviceDate: true, amount: true },
+  });
+  await logAction({
+    action: "DELETE",
+    entity: "ServiceIncome",
+    entityId: deleted.id,
+    details: { serviceDate: deleted.serviceDate.toISOString(), amount: Number(deleted.amount) },
+  });
   redirect("/tithes-offering");
 }

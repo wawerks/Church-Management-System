@@ -2,12 +2,12 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
 import { AttendanceReportExport } from "@/components/AttendanceReportExport";
-import { canExportReports } from "@/lib/permissions";
+import { canExportAttendanceReports } from "@/lib/permissions";
 
 export default async function AttendanceReportsPage() {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
-  const canExport = canExportReports(session.role);
+  const canExport = canExportAttendanceReports(session.role);
 
   let events: Array<{ id: string; title: string; date: Date }> = [];
   try {

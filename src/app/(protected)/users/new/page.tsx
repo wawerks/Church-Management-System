@@ -14,7 +14,7 @@ export default async function NewUserPage() {
           <h1 className="text-2xl font-semibold">Add user</h1>
           <p className="mt-1 text-sm text-slate-600">
             Choose a role: <strong>Pastor</strong> is view-only;{" "}
-            <strong>Staff</strong> can run attendance, donations, and exports.
+            <strong>Staff</strong> can run attendance, donations, expenses, and exports.
           </p>
         </div>
         <Link
@@ -72,7 +72,10 @@ export default async function NewUserPage() {
             <option value="ADMIN">Admin — full access + user management</option>
             <option value="PASTOR">Pastor — view only</option>
             <option value="STAFF">
-              Staff — attendance, donations, report exports
+              Staff — attendance, donations, expenses, report exports
+            </option>
+            <option value="TREASURER">
+              Treasurer — donations, tithes/offering, expenses, financial reports
             </option>
           </select>
         </label>

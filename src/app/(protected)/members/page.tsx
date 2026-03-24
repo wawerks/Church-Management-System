@@ -14,24 +14,13 @@ import type { Prisma } from "@/generated/prisma/client";
 export default async function MembersPage(props: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateMembers(session.role);
 
   const qRaw = props.searchParams?.q;
   const q =
     typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? qRaw[0]?.trim() ?? "" : "";
-
-  const pageRaw = props.searchParams?.page;
-  const page =
-    typeof pageRaw === "string"
-      ? Math.max(1, Number(pageRaw) || 1)
-      : Array.isArray(pageRaw)
-        ? Math.max(1, Number(pageRaw[0]) || 1)
-        : 1;
-
-  const take = 10;
-  const skip = (page - 1) * take;
 
   const where: Prisma.MemberWhereInput = q
     ? {
@@ -52,25 +41,17 @@ export default async function MembersPage(props: {
     familyGroup: { id: string; familyName: string } | null;
   }> = [];
 
-  let total = 0;
   let dbReady = true;
 
   try {
-    [total, members] = await Promise.all([
-      prisma.member.count({ where }),
-      prisma.member.findMany({
-        where,
-        take,
-        skip,
-        orderBy: { lastName: "asc" },
-        include: { familyGroup: true },
-      }),
-    ]);
+    members = await prisma.member.findMany({
+      where,
+      orderBy: { lastName: "asc" },
+      include: { familyGroup: true },
+    });
   } catch {
     dbReady = false;
   }
-
-  const totalPages = Math.max(1, Math.ceil(total / take));
 
   return (
     <div className="space-y-4">
@@ -117,9 +98,9 @@ export default async function MembersPage(props: {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+      <div className="flex h-[calc(100vh-140px)] flex-col rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto border-b border-slate-100">
+          <table className="min-w-full table-fixed text-sm">
             <thead className="bg-slate-50">
               <tr className="text-left text-slate-700">
                 <th className="px-4 py-3 font-medium">Name</th>
@@ -131,6 +112,11 @@ export default async function MembersPage(props: {
                 ) : null}
               </tr>
             </thead>
+          </table>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="min-w-full table-fixed text-sm">
             <tbody>
               {members.length === 0 ? (
                 <tr>
@@ -185,28 +171,9 @@ export default async function MembersPage(props: {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Link
-          href={`/members?page=${Math.max(1, page - 1)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-          className={`rounded-md border px-3 py-2 text-sm ${page <= 1 ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}`}
-          aria-disabled={page <= 1}
-        >
-          Previous
-        </Link>
-
-        <div className="text-sm text-slate-600">
-          Page {page} of {totalPages}
+        <div className="border-t border-slate-100 px-4 py-2 text-sm text-slate-600">
+          {members.length} member(s)
         </div>
-
-        <Link
-          href={`/members?page=${Math.min(totalPages, page + 1)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-          className={`rounded-md border px-3 py-2 text-sm ${page >= totalPages ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}`}
-          aria-disabled={page >= totalPages}
-        >
-          Next
-        </Link>
       </div>
     </div>
   );

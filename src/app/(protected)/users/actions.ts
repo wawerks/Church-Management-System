@@ -5,13 +5,14 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { requireRole, getServerSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 import type { Role } from "@/generated/prisma/enums";
 
 const CreateUserSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(200),
-  role: z.enum(["ADMIN", "PASTOR", "STAFF"]),
+  role: z.enum(["ADMIN", "PASTOR", "STAFF", "TREASURER"]),
 });
 
 export async function createUserAction(formData: FormData) {
@@ -40,13 +41,19 @@ export async function createUserAction(formData: FormData) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash,
       role,
     },
+  });
+  await logAction({
+    action: "CREATE",
+    entity: "User",
+    entityId: user.id,
+    details: { name: user.name, email: user.email, role: user.role },
   });
 
   redirect("/users");
@@ -61,6 +68,15 @@ export async function deleteUserAction(userId: string) {
     throw new Error("You cannot delete your own account.");
   }
 
-  await prisma.user.delete({ where: { id: userId } });
+  const deleted = await prisma.user.delete({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, role: true },
+  });
+  await logAction({
+    action: "DELETE",
+    entity: "User",
+    entityId: deleted.id,
+    details: { name: deleted.name, email: deleted.email, role: deleted.role },
+  });
   redirect("/users");
 }

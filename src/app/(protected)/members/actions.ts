@@ -4,6 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 import type { Role } from "@/generated/prisma/enums";
 
 const MemberSchema = z.object({
@@ -63,7 +64,7 @@ export async function createMemberAction(formData: FormData) {
   const birthdateStr = emptyToUndefined(data.birthdate);
   const birthdate = birthdateStr ? new Date(birthdateStr) : undefined;
 
-  await prisma.member.create({
+  const member = await prisma.member.create({
     data: {
       firstName: data.firstName,
       lastName: data.lastName,
@@ -73,6 +74,12 @@ export async function createMemberAction(formData: FormData) {
       address: emptyToUndefined(data.address),
       familyGroupId,
     },
+  });
+  await logAction({
+    action: "CREATE",
+    entity: "Member",
+    entityId: member.id,
+    details: { firstName: member.firstName, lastName: member.lastName },
   });
 
   // Go back to list
@@ -122,7 +129,7 @@ export async function updateMemberAction(
   const birthdateStr = emptyToUndefined(data.birthdate);
   const birthdate = birthdateStr ? new Date(birthdateStr) : undefined;
 
-  await prisma.member.update({
+  const member = await prisma.member.update({
     where: { id: memberId },
     data: {
       firstName: data.firstName,
@@ -134,13 +141,28 @@ export async function updateMemberAction(
       familyGroupId,
     },
   });
+  await logAction({
+    action: "UPDATE",
+    entity: "Member",
+    entityId: member.id,
+    details: { firstName: member.firstName, lastName: member.lastName },
+  });
 
   redirect("/members");
 }
 
 export async function deleteMemberAction(memberId: string) {
   await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
-  await prisma.member.delete({ where: { id: memberId } });
+  const deleted = await prisma.member.delete({
+    where: { id: memberId },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  await logAction({
+    action: "DELETE",
+    entity: "Member",
+    entityId: deleted.id,
+    details: { firstName: deleted.firstName, lastName: deleted.lastName },
+  });
   redirect("/members");
 }
 

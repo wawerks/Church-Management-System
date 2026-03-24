@@ -134,15 +134,15 @@ export default async function DashboardPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">
+        <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-[#1f6b87] to-[#253056] p-4 text-white">
+          <div className="text-sm font-medium text-slate-100">
             Total Members
           </div>
           <div className="mt-2 text-3xl font-semibold">{totalMembers}</div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">
+        <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-[#1f6b87] to-[#253056] p-4 text-white">
+          <div className="text-sm font-medium text-slate-100">
             Attendance Today
           </div>
           <div className="mt-2 text-3xl font-semibold">
@@ -151,8 +151,8 @@ export default async function DashboardPage() {
         </div>
 
         {showDonations ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-medium text-slate-600">
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-[#1f6b87] to-[#253056] p-4 text-white">
+            <div className="text-sm font-medium text-slate-100">
               Monthly Donations
             </div>
             <div className="mt-2 text-3xl font-semibold">

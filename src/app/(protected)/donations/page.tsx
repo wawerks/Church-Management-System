@@ -55,7 +55,7 @@ function formatMoney(value: number) {
 export default async function DonationsPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
   const searchParams = await props.searchParams;

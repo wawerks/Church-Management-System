@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `actionlog` MODIFY `actorRole` ENUM('ADMIN', 'PASTOR', 'STAFF', 'TREASURER') NOT NULL;
+
+-- AlterTable
+ALTER TABLE `user` MODIFY `role` ENUM('ADMIN', 'PASTOR', 'STAFF', 'TREASURER') NOT NULL DEFAULT 'STAFF';

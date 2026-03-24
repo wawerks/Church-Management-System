@@ -18,7 +18,7 @@ function formatDate(d: Date) {
 export default async function EventsPage(props: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  await requireRole(["ADMIN", "PASTOR"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateEvents(session.role);
 

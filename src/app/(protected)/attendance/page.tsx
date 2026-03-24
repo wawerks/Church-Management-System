@@ -15,13 +15,14 @@ function toMap<T extends string>(arr: Array<{ memberId: string; status: T }>) {
 }
 
 export default async function AttendancePage(props: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canMark = canMarkAttendance(session.role);
 
-  const eventIdRaw = props.searchParams?.eventId;
+  const searchParams = await props.searchParams;
+  const eventIdRaw = searchParams?.eventId;
   const eventId =
     typeof eventIdRaw === "string"
       ? eventIdRaw

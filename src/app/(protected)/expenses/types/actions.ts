@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -24,8 +25,14 @@ export async function createExpenseTypeAction(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  await prisma.expenseType.create({
+  const expenseType = await prisma.expenseType.create({
     data: { name: parsed.data.name },
+  });
+  await logAction({
+    action: "CREATE",
+    entity: "ExpenseType",
+    entityId: expenseType.id,
+    details: { name: expenseType.name },
   });
 
   redirect("/expenses/types");
@@ -33,6 +40,15 @@ export async function createExpenseTypeAction(formData: FormData) {
 
 export async function deleteExpenseTypeAction(id: string) {
   await requireRole(["ADMIN"] satisfies Role[]);
-  await prisma.expenseType.delete({ where: { id } });
+  const deleted = await prisma.expenseType.delete({
+    where: { id },
+    select: { id: true, name: true },
+  });
+  await logAction({
+    action: "DELETE",
+    entity: "ExpenseType",
+    entityId: deleted.id,
+    details: { name: deleted.name },
+  });
   redirect("/expenses/types");
 }

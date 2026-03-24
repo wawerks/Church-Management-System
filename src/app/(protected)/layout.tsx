@@ -12,29 +12,32 @@ function MobileNav(props: { role: Role }) {
     ...(canManageUsers(role)
       ? [{ href: "/users", label: "Users" as const }]
       : []),
-    { href: "/members", label: "Members", roles: ["ADMIN", "PASTOR", "STAFF"] },
-    { href: "/attendance", label: "Attendance", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    { href: "/members", label: "Members", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
+    { href: "/attendance", label: "Attendance", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     {
       href: "/tithes-offering",
       label: "Tithes & Offering",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
-    { href: "/donations", label: "Donations", roles: ["ADMIN", "PASTOR", "STAFF"] },
-    { href: "/expenses", label: "Expenses", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    { href: "/donations", label: "Donations", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
+    { href: "/expenses", label: "Expenses", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     ...(canManageUsers(role)
       ? [{ href: "/expenses/types", label: "Expense Types", roles: ["ADMIN"] as Role[] }]
       : []),
-    { href: "/events", label: "Events", roles: ["ADMIN", "PASTOR"] },
+    { href: "/events", label: "Events", roles: ["ADMIN", "PASTOR", "TREASURER"] },
     {
       href: "/reports/financial",
       label: "Fin. Reports",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
     {
       href: "/reports/attendance",
       label: "Att. Reports",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
+    ...(canManageUsers(role)
+      ? [{ href: "/logs", label: "Logs", roles: ["ADMIN"] as Role[] }]
+      : []),
   ];
 
   return (
@@ -77,21 +80,7 @@ export default async function ProtectedLayout({
         <Sidebar role={session.role} userName={session.name} />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <MobileNav role={session.role} />
-          <header className="hidden border-b border-slate-200/80 bg-white/90 px-6 py-4 backdrop-blur md:block">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold tracking-tight text-slate-900">
-                  Church Admin
-                </div>
-                <div className="text-xs text-slate-600">{session.email}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-600">Role: {session.role}</div>
-              </div>
-            </div>
-          </header>
-
-          <main className="p-4">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4">{children}</main>
         </div>
       </div>
     </div>

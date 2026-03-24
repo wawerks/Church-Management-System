@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #eaf3fa;
-  --foreground: #0f2f4a;
-  --primary: #0f4f77;
-  --primary-hover: #156792;
-  --surface: #ffffff;
-  --surface-soft: #f3f9fd;
-  --border: #d3e1ec;
-  --sidebar-bg: #0e5a84;
-  --sidebar-border: #1f6f99;
-  --sidebar-text: #ecf7ff;
-  --sidebar-muted: #b8d8eb;
+  --background: #bfd0d3;
+  --foreground: #25343f;
+  --primary: #1f6b87;
+  --primary-hover: #2a7c9b;
+  --surface: #f7f9fa;
+  --surface-soft: #eef3f5;
+  --border: #d8e0e4;
+  --sidebar-bg: #1f6b87;
+  --sidebar-border: #3f7f99;
+  --sidebar-text: #e9f2f6;
+  --sidebar-muted: #bdd1db;
   color-scheme: light;
 }
 
@@ -31,21 +31,32 @@ body {
 
 .app-shell {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eaf3fa 0%, #e5f0f9 100%);
+  background: var(--background);
+}
+
+/* Global corner system for a softer UI */
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 .page-transition {
-  animation: pageFadeSlide 260ms ease;
+  animation: pagePopIn 1800ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 
-@keyframes pageFadeSlide {
+@keyframes pagePopIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: scale(0.84) translateY(34px);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1) translateY(0);
+    filter: blur(0);
   }
 }
 
@@ -67,17 +78,19 @@ body {
 
 .bg-white {
   background-color: var(--surface) !important;
+  box-shadow: 0 4px 14px rgba(24, 45, 56, 0.08);
+  border-radius: var(--radius-lg) !important;
 }
 
 .text-slate-900,
 .text-slate-800,
 .text-slate-700 {
-  color: #143a56 !important;
+  color: #293844 !important;
 }
 
 .text-slate-600,
 .text-slate-500 {
-  color: #475569 !important;
+  color: #6f818e !important;
 }
 
 .bg-slate-50 {
@@ -90,11 +103,11 @@ h3,
 h4,
 h5,
 h6 {
-  color: #1d5f84;
+  color: #243540;
 }
 
 aside {
-  background: linear-gradient(180deg, var(--sidebar-bg) 0%, #0c5077 100%) !important;
+  background: linear-gradient(180deg, #1f6b87 0%, #1d6078 100%) !important;
   border-right: 1px solid var(--sidebar-border) !important;
 }
 
@@ -110,25 +123,79 @@ aside .text-slate-500 {
 }
 
 aside a {
-  color: var(--sidebar-text) !important;
-}
-
-aside a:hover {
-  background-color: rgba(255, 255, 255, 0.14) !important;
-  color: #ffffff !important;
+  color: inherit;
 }
 
 header {
-  background-color: rgba(255, 255, 255, 0.92) !important;
+  background-color: rgba(247, 249, 250, 0.92) !important;
   border-bottom: 1px solid var(--border);
 }
 
 input,
 select,
 textarea {
-  background: #ffffff;
+  background: #fdfefe;
   border: 1px solid var(--border);
-  color: #143a56;
+  color: #293844;
+  border-radius: var(--radius-md);
+}
+
+button {
+  border-radius: var(--radius-md) !important;
+}
+
+a {
+  border-radius: var(--radius-sm);
+}
+
+.rounded-sm {
+  border-radius: var(--radius-sm) !important;
+}
+
+.rounded-md {
+  border-radius: var(--radius-md) !important;
+}
+
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl {
+  border-radius: var(--radius-lg) !important;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+table thead tr th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+
+table thead tr th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+
+table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* Keep table wrappers clipped to card radius */
+.rounded-lg.border,
+.rounded-xl.border,
+.rounded-2xl.border {
+  overflow: hidden;
+}
+
+.rounded-lg.border > .overflow-x-auto,
+.rounded-xl.border > .overflow-x-auto,
+.rounded-2xl.border > .overflow-x-auto {
+  border-radius: inherit;
 }
 
 input:focus-visible,

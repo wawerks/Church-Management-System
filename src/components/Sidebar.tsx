@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { LogoutButton } from "@/components/LogoutButton";
 import { canManageUsers } from "@/lib/permissions";
@@ -14,7 +17,8 @@ type IconName =
   | "expenses"
   | "events"
   | "reportFinancial"
-  | "reportAttendance";
+  | "reportAttendance"
+  | "logs";
 
 function NavIcon({ name }: { name: IconName }) {
   const common = "h-4 w-4 text-current";
@@ -53,6 +57,13 @@ function NavIcon({ name }: { name: IconName }) {
       </svg>
     );
   }
+  if (name === "logs") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={common}>
+        <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5h10V6H7v2Zm0 4h10v-2H7v2Zm0 4h7v-2H7v2Z" fill="currentColor" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" fill="none" className={common}>
       <path d="M3 3h18v6H3V3Zm0 8h18v10H3V11Zm2 2v6h14v-6H5Z" fill="currentColor" />
@@ -60,12 +71,22 @@ function NavIcon({ name }: { name: IconName }) {
   );
 }
 
-function NavItem(props: { href: string; label: string; icon: IconName }) {
+function NavItem(props: {
+  href: string;
+  label: string;
+  icon: IconName;
+  isActive: boolean;
+}) {
   return (
     <li>
       <Link
         href={props.href}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white/10 hover:text-white"
+        aria-current={props.isActive ? "page" : undefined}
+        className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+          props.isActive
+            ? "bg-[#f4fbfd] !text-[#2f7d98] shadow-[0_2px_8px_rgba(12,45,58,0.16)]"
+            : "!text-white hover:bg-white/10 !hover:text-white"
+        }`}
       >
         <NavIcon name={props.icon} />
         {props.label}
@@ -74,32 +95,29 @@ function NavItem(props: { href: string; label: string; icon: IconName }) {
   );
 }
 
-function Divider() {
-  return <div className="my-3 h-px bg-slate-200" />;
-}
-
 export function Sidebar(props: {
   role: Role;
   userName?: string;
   children?: ReactNode;
 }) {
   const role = props.role;
+  const pathname = usePathname();
 
   const topNav: Array<{ href: string; label: string; icon: IconName; roles?: Role[] }> = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
     ...(canManageUsers(role)
       ? [{ href: "/users", label: "Users & roles" as const, icon: "users" as const }]
       : []),
-    { href: "/members", label: "Members", icon: "members", roles: ["ADMIN", "PASTOR", "STAFF"] },
-    { href: "/attendance", label: "Attendance", icon: "attendance", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    { href: "/members", label: "Members", icon: "members", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
+    { href: "/attendance", label: "Attendance", icon: "attendance", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     {
       href: "/tithes-offering",
       label: "Tithes & Offering",
       icon: "income",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
-    { href: "/donations", label: "Donations", icon: "donations", roles: ["ADMIN", "PASTOR", "STAFF"] },
-    { href: "/expenses", label: "Expenses", icon: "expenses", roles: ["ADMIN", "PASTOR", "STAFF"] },
+    { href: "/donations", label: "Donations", icon: "donations", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
+    { href: "/expenses", label: "Expenses", icon: "expenses", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     ...(canManageUsers(role)
       ? [
           {
@@ -110,46 +128,64 @@ export function Sidebar(props: {
           },
         ]
       : []),
-    { href: "/events", label: "Events", icon: "events", roles: ["ADMIN", "PASTOR"] },
+    { href: "/events", label: "Events", icon: "events", roles: ["ADMIN", "PASTOR", "TREASURER"] },
     {
       href: "/reports/financial",
       label: "Financial Reports",
       icon: "reportFinancial",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
     {
       href: "/reports/attendance",
       label: "Attendance Reports",
       icon: "reportAttendance",
-      roles: ["ADMIN", "PASTOR", "STAFF"],
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
+    ...(canManageUsers(role)
+      ? [{ href: "/logs", label: "Action Logs", icon: "logs" as const, roles: ["ADMIN"] as Role[] }]
+      : []),
   ];
 
+  function isActivePath(href: string) {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  function initials(name?: string) {
+    if (!name) return "CA";
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-slate-200/90 bg-white/95 backdrop-blur md:block">
-      <div className="flex h-full flex-col overflow-hidden p-4">
-        <div className="pb-4">
-          <div className="text-lg font-semibold tracking-tight text-slate-900">
-            Church Admin
+    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-hidden rounded-r-[30px] bg-[#236d88] md:block">
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="bg-[#1f2544] px-5 pb-6 pt-4">
+          <div className="mx-auto mt-5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-[#d9e5ed] bg-[#44638c] text-3xl font-bold text-white">
+            {initials(props.userName)}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
-            {props.userName ? `Signed in as ${props.userName}` : `Role: ${role}`}
+          <div className="mt-5 text-center text-xs font-bold tracking-wide text-[#f4f8ff]">
+            {(props.userName ?? "Church Admin").toUpperCase()}
           </div>
         </div>
 
-        <nav>
-          <ul className="space-y-1">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-3">
+          <ul className="space-y-2.5">
             {topNav
               .filter((i) => !i.roles || i.roles.includes(role))
               .map((i) => (
-                <NavItem key={i.href} href={i.href} label={i.label} icon={i.icon} />
+                <NavItem
+                  key={i.href}
+                  href={i.href}
+                  label={i.label}
+                  icon={i.icon}
+                  isActive={isActivePath(i.href)}
+                />
               ))}
           </ul>
         </nav>
 
-        <Divider />
-
-        <div className="mt-auto">
+        <div className="px-4 pb-4">
           <LogoutButton />
         </div>
       </div>

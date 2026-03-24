@@ -59,9 +59,9 @@ function formatMoney(value: number) {
   });
 }
 
-/** Exports: Admin + Staff only (Pastor is view-only on report pages). */
+/** Exports: Admin + Staff + Treasurer (Pastor is view-only on report pages). */
 function isAllowedRole(role: string): role is Role {
-  return role === "ADMIN" || role === "STAFF";
+  return role === "ADMIN" || role === "STAFF" || role === "TREASURER";
 }
 
 async function financialData(params: URLSearchParams) {

@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/permissions";
 
 export default async function NewExpensePage() {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
 
   let expenseTypes: Array<{ id: string; name: string }> = [];

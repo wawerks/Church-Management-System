@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -14,7 +15,7 @@ const ExpenseSchema = z.object({
 });
 
 export async function createExpenseAction(formData: FormData) {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
 
   const parsed = ExpenseSchema.safeParse({
     type: (formData.get("type") ?? "") as string,
@@ -41,7 +42,7 @@ export async function createExpenseAction(formData: FormData) {
     throw new Error("Invalid expense type");
   }
 
-  await prisma.expense.create({
+  const expense = await prisma.expense.create({
     data: {
       type,
       claimedBy,
@@ -49,12 +50,37 @@ export async function createExpenseAction(formData: FormData) {
       amount,
     },
   });
+  await logAction({
+    action: "CREATE",
+    entity: "Expense",
+    entityId: expense.id,
+    details: {
+      type: expense.type,
+      claimedBy: expense.claimedBy,
+      amount: Number(expense.amount),
+      date: expense.date.toISOString(),
+    },
+  });
 
   redirect("/expenses");
 }
 
 export async function deleteExpenseAction(expenseId: string) {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
-  await prisma.expense.delete({ where: { id: expenseId } });
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
+  const deleted = await prisma.expense.delete({
+    where: { id: expenseId },
+    select: { id: true, type: true, claimedBy: true, amount: true, date: true },
+  });
+  await logAction({
+    action: "DELETE",
+    entity: "Expense",
+    entityId: deleted.id,
+    details: {
+      type: deleted.type,
+      claimedBy: deleted.claimedBy,
+      amount: Number(deleted.amount),
+      date: deleted.date.toISOString(),
+    },
+  });
   redirect("/expenses");
 }

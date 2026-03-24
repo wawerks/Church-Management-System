@@ -5,7 +5,7 @@ import { SubmitButton } from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
 
 export default async function NewServiceIncomePage() {
-  await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
 
   return (
     <div className="mx-auto max-w-2xl">

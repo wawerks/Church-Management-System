@@ -7,7 +7,7 @@ import { deleteServiceIncomeAction } from "./actions";
 import { SubmitButton } from "@/components/form-buttons";
 
 export default async function TithesOfferingPage() {
-  await requireRole(["ADMIN", "PASTOR", "STAFF"] satisfies Role[]);
+  await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
 

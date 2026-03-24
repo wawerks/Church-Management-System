@@ -5,7 +5,7 @@ import type { Role } from "@/generated/prisma/enums";
 import { AttendanceStatus as AttendanceStatusEnum } from "@/generated/prisma/enums";
 
 function isAllowedRole(role: string): role is Role {
-  return role === "ADMIN" || role === "PASTOR" || role === "STAFF";
+  return role === "ADMIN" || role === "PASTOR" || role === "STAFF" || role === "TREASURER";
 }
 
 function toInputDate(value: string | null) {

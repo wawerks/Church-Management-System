@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { logAction } from "@/lib/action-log";
 
 const BodySchema = z.object({
   eventId: z.string().min(1),
@@ -41,10 +42,22 @@ export async function POST(req: Request) {
   }));
 
   if (data.length === 0) {
+    await logAction({
+      action: "REPLACE",
+      entity: "Attendance",
+      entityId: eventId,
+      details: { eventId, recordsCount: 0 },
+    });
     return NextResponse.json({ ok: true });
   }
 
   await prisma.attendance.createMany({ data });
+  await logAction({
+    action: "REPLACE",
+    entity: "Attendance",
+    entityId: eventId,
+    details: { eventId, recordsCount: data.length },
+  });
 
   return NextResponse.json({ ok: true });
 }

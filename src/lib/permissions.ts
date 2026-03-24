@@ -4,7 +4,8 @@ import type { Role } from "@/generated/prisma/enums";
  * Role matrix (current product rules):
  * - ADMIN: full access + user management
  * - PASTOR: view-only (no mutations / no exports)
- * - STAFF: members, attendance, donations, report exports (no events CRUD)
+ * - STAFF: members, attendance, donations/expenses/tithes mutations, report exports
+ * - TREASURER: donations/expenses/tithes mutations + financial reports, view-only elsewhere
  */
 
 export function canManageUsers(role: Role) {
@@ -27,12 +28,12 @@ export function canMarkAttendance(role: Role) {
 
 /** Create / edit / delete donations */
 export function canMutateDonations(role: Role) {
-  return role === "ADMIN" || role === "STAFF";
+  return role === "ADMIN" || role === "STAFF" || role === "TREASURER";
 }
 
 /** View events list (read-only for Pastor; Staff uses attendance picker only) */
 export function canViewEventsPage(role: Role) {
-  return role === "ADMIN" || role === "PASTOR";
+  return role === "ADMIN" || role === "PASTOR" || role === "TREASURER";
 }
 
 /** Create / edit / delete events */
@@ -41,18 +42,23 @@ export function canMutateEvents(role: Role) {
 }
 
 export function canAccessDonationsPage(role: Role) {
-  return role === "ADMIN" || role === "PASTOR" || role === "STAFF";
+  return role === "ADMIN" || role === "PASTOR" || role === "STAFF" || role === "TREASURER";
 }
 
 export function canAccessReportsPage(role: Role) {
-  return role === "ADMIN" || role === "PASTOR" || role === "STAFF";
+  return role === "ADMIN" || role === "PASTOR" || role === "STAFF" || role === "TREASURER";
 }
 
-/** Download Excel / PDF / Word */
-export function canExportReports(role: Role) {
+/** Download financial report files */
+export function canExportFinancialReports(role: Role) {
+  return role === "ADMIN" || role === "STAFF" || role === "TREASURER";
+}
+
+/** Download attendance report files */
+export function canExportAttendanceReports(role: Role) {
   return role === "ADMIN" || role === "STAFF";
 }
 
 export function canViewDashboardDonations(role: Role) {
-  return role === "ADMIN" || role === "PASTOR" || role === "STAFF";
+  return role === "ADMIN" || role === "PASTOR" || role === "STAFF" || role === "TREASURER";
 }
