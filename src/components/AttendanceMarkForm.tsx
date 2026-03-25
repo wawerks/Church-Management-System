@@ -140,62 +140,64 @@ export function AttendanceMarkForm(props: {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50">
-            <tr className="text-left text-slate-700">
-              <th className="px-4 py-3 font-medium">Member</th>
-              <th className="px-4 py-3 font-medium">Present</th>
-              <th className="px-4 py-3 font-medium">Absent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.members.map((m) => {
-              const current = statuses[m.id] ?? "ABSENT";
-              return (
-                <tr key={m.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium">
-                    {m.firstName} {m.lastName}
-                  </td>
-                  <td className="px-4 py-3">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name={`status-${m.id}`}
-                        checked={current === "PRESENT"}
-                        disabled={props.readOnly || saving}
-                        onChange={() =>
-                          setStatuses((prev) => ({
-                            ...prev,
-                            [m.id]: "PRESENT",
-                          }))
-                        }
-                      />
-                      <span className="text-slate-700">Present</span>
-                    </label>
-                  </td>
-                  <td className="px-4 py-3">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name={`status-${m.id}`}
-                        checked={current === "ABSENT"}
-                        disabled={props.readOnly || saving}
-                        onChange={() =>
-                          setStatuses((prev) => ({
-                            ...prev,
-                            [m.id]: "ABSENT",
-                          }))
-                        }
-                      />
-                      <span className="text-slate-700">Absent</span>
-                    </label>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="max-h-[min(50vh,26rem)] overflow-auto overscroll-contain">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_0_rgb(226_232_240)]">
+              <tr className="text-left text-slate-700">
+                <th className="px-4 py-3 font-medium">Member</th>
+                <th className="px-4 py-3 font-medium">Present</th>
+                <th className="px-4 py-3 font-medium">Absent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.members.map((m) => {
+                const current = statuses[m.id] ?? "ABSENT";
+                return (
+                  <tr key={m.id} className="border-t border-slate-100">
+                    <td className="px-4 py-3 font-medium">
+                      {m.firstName} {m.lastName}
+                    </td>
+                    <td className="px-4 py-3">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`status-${m.id}`}
+                          checked={current === "PRESENT"}
+                          disabled={props.readOnly || saving}
+                          onChange={() =>
+                            setStatuses((prev) => ({
+                              ...prev,
+                              [m.id]: "PRESENT",
+                            }))
+                          }
+                        />
+                        <span className="text-slate-700">Present</span>
+                      </label>
+                    </td>
+                    <td className="px-4 py-3">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`status-${m.id}`}
+                          checked={current === "ABSENT"}
+                          disabled={props.readOnly || saving}
+                          onChange={() =>
+                            setStatuses((prev) => ({
+                              ...prev,
+                              [m.id]: "ABSENT",
+                            }))
+                          }
+                        />
+                        <span className="text-slate-700">Absent</span>
+                      </label>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {message ? (

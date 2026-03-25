@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
 import { deleteServiceIncomeAction } from "./actions";
-import { SubmitButton } from "@/components/form-buttons";
+import { DeleteSubmitButton } from "@/components/form-buttons";
+import { AddServiceIncomeModal } from "@/components/AddServiceIncomeModal";
 
 export default async function TithesOfferingPage() {
   await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
@@ -38,7 +38,7 @@ export default async function TithesOfferingPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Tithes & Offering</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -46,12 +46,7 @@ export default async function TithesOfferingPage() {
           </p>
         </div>
         {canEdit ? (
-          <Link
-            href="/tithes-offering/new"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            + Add Service Income
-          </Link>
+          <AddServiceIncomeModal />
         ) : null}
       </div>
 
@@ -114,12 +109,7 @@ export default async function TithesOfferingPage() {
                     {canEdit ? (
                       <td className="px-4 py-3">
                         <form action={deleteServiceIncomeAction.bind(null, r.id)}>
-                          <SubmitButton
-                            pendingLabel="Deleting..."
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                          >
-                            Delete
-                          </SubmitButton>
+                          <DeleteSubmitButton />
                         </form>
                       </td>
                     ) : null}

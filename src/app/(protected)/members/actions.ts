@@ -153,9 +153,23 @@ export async function updateMemberAction(
 
 export async function deleteMemberAction(memberId: string) {
   await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
-  const deleted = await prisma.member.delete({
-    where: { id: memberId },
-    select: { id: true, firstName: true, lastName: true },
+  const deleted = await prisma.$transaction(async (tx) => {
+    const existing = await tx.member.findUnique({
+      where: { id: memberId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (!existing) {
+      throw new Error("Member not found.");
+    }
+
+    // Remove dependent rows first to satisfy FK constraints.
+    await tx.attendance.deleteMany({ where: { memberId } });
+    await tx.donation.deleteMany({ where: { memberId } });
+
+    return tx.member.delete({
+      where: { id: memberId },
+      select: { id: true, firstName: true, lastName: true },
+    });
   });
   await logAction({
     action: "DELETE",

@@ -10,11 +10,11 @@ export default async function FinancialReportsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h1 className="text-2xl font-semibold">Financial Reports</h1>
         <p className="mt-1 text-sm text-slate-600">
           {canExport
-            ? "Export totals for Tithes & Offering and Donations in Excel, PDF, or Word."
+            ? "Export financial data including Tithes & Offering, Donations, expense totals, and expenses by type in Excel, PDF, or Word."
             : "View report options. Downloads are available to Admin, Staff, and Treasurer only."}
         </p>
       </div>

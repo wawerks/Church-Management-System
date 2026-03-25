@@ -1,24 +1,22 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateMembers } from "@/lib/permissions";
 import { deleteMemberAction } from "./actions";
-import {
-  GetSubmitButton,
-  PendingGetForm,
-  SubmitButton,
-} from "@/components/form-buttons";
+import { GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
 import type { Role } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import { AddMemberModal } from "@/components/AddMemberModal";
+import { MemberRowActionsMenu } from "@/components/MemberRowActionsMenu";
 
 export default async function MembersPage(props: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateMembers(session.role);
 
-  const qRaw = props.searchParams?.q;
+  const searchParams = await props.searchParams;
+  const qRaw = searchParams?.q;
   const q =
     typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? qRaw[0]?.trim() ?? "" : "";
 
@@ -38,6 +36,7 @@ export default async function MembersPage(props: {
     gender: string | null;
     birthdate: Date | null;
     contactNumber: string | null;
+    address: string | null;
     familyGroup: { id: string; familyName: string } | null;
   }> = [];
 
@@ -53,9 +52,19 @@ export default async function MembersPage(props: {
     dbReady = false;
   }
 
+  let familyGroups: Array<{ id: string; familyName: string }> = [];
+  try {
+    familyGroups = await prisma.familyGroup.findMany({
+      orderBy: { familyName: "asc" },
+      select: { id: true, familyName: true },
+    });
+  } catch {
+    // ignore
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Members</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -82,12 +91,7 @@ export default async function MembersPage(props: {
             </GetSubmitButton>
           </PendingGetForm>
           {canEdit ? (
-            <Link
-              href="/members/new"
-              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-            >
-              + Add Member
-            </Link>
+            <AddMemberModal familyGroups={familyGroups} />
           ) : null}
         </div>
       </div>
@@ -108,7 +112,9 @@ export default async function MembersPage(props: {
                 <th className="px-4 py-3 font-medium">Family</th>
                 <th className="px-4 py-3 font-medium">Contact</th>
                 {canEdit ? (
-                  <th className="px-4 py-3 font-medium">Actions</th>
+                  <th className="w-14 px-2 py-3 text-right font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 ) : null}
               </tr>
             </thead>
@@ -143,26 +149,22 @@ export default async function MembersPage(props: {
                       {m.contactNumber ?? "—"}
                     </td>
                     {canEdit ? (
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/members/${m.id}/edit`}
-                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            Edit
-                          </Link>
-
-                          <form
-                            action={deleteMemberAction.bind(null, m.id)}
-                          >
-                            <SubmitButton
-                              pendingLabel="Deleting…"
-                              className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                            >
-                              Delete
-                            </SubmitButton>
-                          </form>
-                        </div>
+                      <td className="px-2 py-3 text-right">
+                        <MemberRowActionsMenu
+                          memberId={m.id}
+                          firstName={m.firstName}
+                          lastName={m.lastName}
+                          gender={m.gender}
+                          birthdateInput={
+                            m.birthdate ? m.birthdate.toISOString().slice(0, 10) : ""
+                          }
+                          contactNumber={m.contactNumber}
+                          address={m.address ?? null}
+                          familyGroupId={m.familyGroup?.id ?? null}
+                          familyGroupName={m.familyGroup?.familyName ?? null}
+                          familyGroups={familyGroups}
+                          deleteAction={deleteMemberAction.bind(null, m.id)}
+                        />
                       </td>
                     ) : null}
                   </tr>

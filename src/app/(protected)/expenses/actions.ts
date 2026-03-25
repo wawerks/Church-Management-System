@@ -9,7 +9,7 @@ import type { Role } from "@/generated/prisma/enums";
 
 const ExpenseSchema = z.object({
   type: z.string().min(1),
-  claimedBy: z.string().trim().min(2),
+  receivedBy: z.string().trim().min(2),
   date: z.string().min(1),
   amount: z.coerce.number().positive(),
 });
@@ -19,7 +19,7 @@ export async function createExpenseAction(formData: FormData) {
 
   const parsed = ExpenseSchema.safeParse({
     type: (formData.get("type") ?? "") as string,
-    claimedBy: (formData.get("claimedBy") ?? "") as string,
+    receivedBy: (formData.get("receivedBy") ?? "") as string,
     date: (formData.get("date") ?? "") as string,
     amount: formData.get("amount"),
   });
@@ -28,7 +28,7 @@ export async function createExpenseAction(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { type, claimedBy, date, amount } = parsed.data;
+  const { type, receivedBy, date, amount } = parsed.data;
   const expenseDate = new Date(date);
   if (Number.isNaN(expenseDate.getTime())) {
     throw new Error("Invalid date");
@@ -45,7 +45,7 @@ export async function createExpenseAction(formData: FormData) {
   const expense = await prisma.expense.create({
     data: {
       type,
-      claimedBy,
+      receivedBy,
       date: expenseDate,
       amount,
     },
@@ -57,6 +57,7 @@ export async function createExpenseAction(formData: FormData) {
     details: {
       type: expense.type,
       claimedBy: expense.claimedBy,
+      receivedBy: expense.receivedBy,
       amount: Number(expense.amount),
       date: expense.date.toISOString(),
     },
@@ -69,7 +70,7 @@ export async function deleteExpenseAction(expenseId: string) {
   await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
   const deleted = await prisma.expense.delete({
     where: { id: expenseId },
-    select: { id: true, type: true, claimedBy: true, amount: true, date: true },
+    select: { id: true, type: true, claimedBy: true, receivedBy: true, amount: true, date: true },
   });
   await logAction({
     action: "DELETE",
@@ -78,6 +79,7 @@ export async function deleteExpenseAction(expenseId: string) {
     details: {
       type: deleted.type,
       claimedBy: deleted.claimedBy,
+      receivedBy: deleted.receivedBy,
       amount: Number(deleted.amount),
       date: deleted.date.toISOString(),
     },

@@ -22,7 +22,7 @@ export default async function AttendanceReportsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h1 className="text-2xl font-semibold">Attendance Reports</h1>
         <p className="mt-1 text-sm text-slate-600">
           {canExport

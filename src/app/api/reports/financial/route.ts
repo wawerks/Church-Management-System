@@ -95,6 +95,11 @@ async function financialData(params: URLSearchParams) {
     select: { serviceDate: true, amount: true },
   });
 
+  const expenses = await prisma.expense.findMany({
+    where: { date: { gte: start, lte: end } },
+    select: { type: true, amount: true, date: true, receivedBy: true },
+  });
+
   const byKey: Record<
     string,
     {
@@ -139,7 +144,48 @@ async function financialData(params: URLSearchParams) {
     a.key.localeCompare(b.key),
   );
 
-  return { format, groupBy, start, end, rows };
+  const overallTithesOffering = serviceIncome.reduce(
+    (sum, s) => sum + Number(s.amount ?? 0),
+    0,
+  );
+  const overallDonations = donations.reduce(
+    (sum, d) => sum + Number(d.amount ?? 0),
+    0,
+  );
+  const overallExpenses = expenses.reduce(
+    (sum, e) => sum + Number(e.amount ?? 0),
+    0,
+  );
+
+  const expenseAgg: Record<
+    string,
+    { type: string; receivedBy: string; amount: number }
+  > = {};
+  for (const e of expenses) {
+    const receivedBy = (e.receivedBy ?? "").trim() || "Unknown";
+    const k = `${e.type}\0${receivedBy}`;
+    if (!expenseAgg[k]) {
+      expenseAgg[k] = { type: e.type, receivedBy, amount: 0 };
+    }
+    expenseAgg[k].amount += Number(e.amount ?? 0);
+  }
+  const expensesByType = Object.values(expenseAgg).sort((a, b) =>
+    a.type !== b.type
+      ? a.type.localeCompare(b.type)
+      : a.receivedBy.localeCompare(b.receivedBy),
+  );
+
+  return {
+    format,
+    groupBy,
+    start,
+    end,
+    rows,
+    overallTithesOffering,
+    overallDonations,
+    overallExpenses,
+    expensesByType,
+  };
 }
 
 export async function GET(req: Request) {
@@ -162,9 +208,9 @@ export async function GET(req: Request) {
 
       ws.columns = [
         { header: "Period", key: "period", width: 20 },
-        { header: "Total", key: "total", width: 14 },
         { header: "Tithes & Offering", key: "serviceIncome", width: 18 },
         { header: "Donations", key: "donations", width: 14 },
+        { header: "Total Income", key: "total", width: 14 },
       ];
 
       ws.getRow(1).font = { bold: true };
@@ -178,6 +224,25 @@ export async function GET(req: Request) {
         row.getCell("total").numFmt = "#,##0.00";
         row.getCell("serviceIncome").numFmt = "#,##0.00";
         row.getCell("donations").numFmt = "#,##0.00";
+        row.getCell("total").numFmt = "#,##0.00";
+      }
+
+      ws.addRow([]);
+      ws.addRow(["Overall Totals"]);
+      const tithesRow = ws.addRow(["Tithes & Offering", data.overallTithesOffering]);
+      const donationsRow = ws.addRow(["Donations", data.overallDonations]);
+      const expensesRow = ws.addRow(["Total Expenses", data.overallExpenses]);
+      tithesRow.getCell(2).numFmt = "#,##0.00";
+      donationsRow.getCell(2).numFmt = "#,##0.00";
+      expensesRow.getCell(2).numFmt = "#,##0.00";
+
+      ws.addRow([]);
+      ws.addRow(["Expenses by Type"]);
+      const expenseHeader = ws.addRow(["Type", "Received By", "Amount"]);
+      expenseHeader.font = { bold: true };
+      for (const ex of data.expensesByType) {
+        const row = ws.addRow([ex.type, ex.receivedBy, ex.amount]);
+        row.getCell(3).numFmt = "#,##0.00";
       }
 
       const buffer = await wb.xlsx.writeBuffer();
@@ -205,7 +270,7 @@ export async function GET(req: Request) {
 
       let y = 740;
       page.drawText(
-        "Period | Total | Tithes & Offering | Donations",
+        "Period | Tithes & Offering | Donations | Total Income",
         { x: 50, y, size: 10, font },
       );
       y -= 18;
@@ -213,6 +278,43 @@ export async function GET(req: Request) {
       for (const r of data.rows) {
         const line = `${r.key} | ${formatMoney(r.total)} | ${formatMoney(r.serviceIncome)} | ${formatMoney(r.donations)}`;
         page.drawText(line, { x: 50, y, size: 9, font });
+        y -= 14;
+        if (y < 60) break;
+      }
+
+      y -= 8;
+      page.drawText("Overall Totals", { x: 50, y, size: 10, font });
+      y -= 14;
+      page.drawText(`Tithes & Offering: ${formatMoney(data.overallTithesOffering)}`, {
+        x: 50,
+        y,
+        size: 9,
+        font,
+      });
+      y -= 14;
+      page.drawText(`Donations: ${formatMoney(data.overallDonations)}`, {
+        x: 50,
+        y,
+        size: 9,
+        font,
+      });
+      y -= 14;
+      page.drawText(`Total Expenses: ${formatMoney(data.overallExpenses)}`, {
+        x: 50,
+        y,
+        size: 9,
+        font,
+      });
+      y -= 18;
+      page.drawText("Expenses by Type", { x: 50, y, size: 10, font });
+      y -= 14;
+      page.drawText("Type | Received By | Amount", { x: 50, y, size: 9, font });
+      y -= 14;
+      for (const ex of data.expensesByType) {
+        page.drawText(
+          `${ex.type} | ${ex.receivedBy} | ${formatMoney(ex.amount)}`,
+          { x: 50, y, size: 9, font },
+        );
         y -= 14;
         if (y < 60) break;
       }
@@ -242,16 +344,16 @@ export async function GET(req: Request) {
             new Paragraph({ text: "" }),
             new Table({
               width: { size: 100, type: "pct" },
-              columnWidths: [1800, 1200, 1800, 1200],
+              columnWidths: [1800, 1800, 1200, 1200],
               rows: [
                 new TableRow({
                   children: [
                     new TableCell({ children: [new Paragraph("Period")] }),
-                    new TableCell({ children: [new Paragraph("Total")] }),
                     new TableCell({
                       children: [new Paragraph("Tithes & Offering")],
                     }),
                     new TableCell({ children: [new Paragraph("Donations")] }),
+                    new TableCell({ children: [new Paragraph("Total Income")] }),
                   ],
                 }),
                 ...data.rows.map(
@@ -262,13 +364,45 @@ export async function GET(req: Request) {
                           children: [new Paragraph(labelFor(r.key, data.groupBy))],
                         }),
                         new TableCell({
-                          children: [new Paragraph(formatMoney(r.total))],
-                        }),
-                        new TableCell({
                           children: [new Paragraph(formatMoney(r.serviceIncome))],
                         }),
                         new TableCell({
                           children: [new Paragraph(formatMoney(r.donations))],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph(formatMoney(r.total))],
+                        }),
+                      ],
+                    }),
+                ),
+              ],
+            }),
+            new Paragraph({ text: "" }),
+            new Paragraph({ text: "Overall Totals", heading: HeadingLevel.HEADING_2 }),
+            new Paragraph({ text: `Tithes & Offering: ${formatMoney(data.overallTithesOffering)}` }),
+            new Paragraph({ text: `Donations: ${formatMoney(data.overallDonations)}` }),
+            new Paragraph({ text: `Total Expenses: ${formatMoney(data.overallExpenses)}` }),
+            new Paragraph({ text: "" }),
+            new Paragraph({ text: "Expenses by Type", heading: HeadingLevel.HEADING_2 }),
+            new Table({
+              width: { size: 100, type: "pct" },
+              columnWidths: [2200, 2200, 1400],
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph("Type")] }),
+                    new TableCell({ children: [new Paragraph("Received By")] }),
+                    new TableCell({ children: [new Paragraph("Amount")] }),
+                  ],
+                }),
+                ...data.expensesByType.map(
+                  (ex) =>
+                    new TableRow({
+                      children: [
+                        new TableCell({ children: [new Paragraph(ex.type)] }),
+                        new TableCell({ children: [new Paragraph(ex.receivedBy)] }),
+                        new TableCell({
+                          children: [new Paragraph(formatMoney(ex.amount))],
                         }),
                       ],
                     }),

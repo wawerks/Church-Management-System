@@ -7,18 +7,24 @@ import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 
-const DonationSchema = z.object({
-  memberId: z.string().min(1),
-  amount: z.coerce.number().positive(),
-  type: z.enum(["DONATION", "OTHERS"]),
-  date: z.string().min(1),
-});
+const DonationSchema = z
+  .object({
+    memberId: z.string().optional(),
+    memberName: z.string().optional(),
+    amount: z.coerce.number().positive(),
+    type: z.enum(["DONATION", "OTHERS"]),
+    date: z.string().min(1),
+  })
+  .refine((data) => Boolean(data.memberId || data.memberName), {
+    message: "Provide either memberId or memberName.",
+  });
 
 export async function createDonationAction(formData: FormData) {
   await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
 
   const parsed = DonationSchema.safeParse({
     memberId: (formData.get("memberId") ?? "") as string,
+    memberName: (formData.get("memberName") ?? "") as string,
     amount: formData.get("amount"),
     type: (formData.get("type") ?? "") as string,
     date: (formData.get("date") ?? "") as string,
@@ -28,12 +34,49 @@ export async function createDonationAction(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { memberId, amount, type, date } = parsed.data;
+  const { memberId, memberName, amount, type, date } = parsed.data;
   const donationDate = new Date(date);
+
+  // Resolve member from either memberId or typed memberName.
+  let resolvedMemberId: string | null = null;
+  let resolvedMemberName: string | null = null;
+
+  if (memberId) {
+    resolvedMemberId = memberId;
+  } else if (memberName) {
+    const fullName = memberName.trim();
+    resolvedMemberName = fullName;
+
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const firstToken = parts[0] ?? "Unknown";
+    const lastToken = parts.slice(1).join(" ") || "Unknown";
+
+    const existing = await prisma.member.findFirst({
+      where: { AND: [{ firstName: firstToken }, { lastName: lastToken }] },
+      select: { id: true },
+    });
+
+    if (existing?.id) {
+      resolvedMemberId = existing.id;
+    } else {
+      const created = await prisma.member.create({
+        data: {
+          firstName: firstToken,
+          lastName: lastToken,
+        },
+        select: { id: true },
+      });
+      resolvedMemberId = created.id;
+    }
+  }
+
+  if (!resolvedMemberId) {
+    throw new Error("Unable to resolve member for donation.");
+  }
 
   const donation = await prisma.donation.create({
     data: {
-      memberId,
+      memberId: resolvedMemberId,
       amount,
       type,
       date: donationDate,
@@ -43,7 +86,13 @@ export async function createDonationAction(formData: FormData) {
     action: "CREATE",
     entity: "Donation",
     entityId: donation.id,
-    details: { memberId, amount, type, date: donationDate.toISOString() },
+    details: {
+      memberId: resolvedMemberId,
+      memberName: resolvedMemberName ?? undefined,
+      amount,
+      type,
+      date: donationDate.toISOString(),
+    },
   });
 
   redirect("/donations");

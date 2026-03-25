@@ -9,6 +9,7 @@ import { canManageUsers } from "@/lib/permissions";
 
 type IconName =
   | "dashboard"
+  | "profile"
   | "users"
   | "members"
   | "attendance"
@@ -26,6 +27,16 @@ function NavIcon({ name }: { name: IconName }) {
     return (
       <svg viewBox="0 0 24 24" fill="none" className={common}>
         <path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (name === "profile") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={common}>
+        <path
+          d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-7 2-7 4.5V20h14v-1.5C19 16 16 14 12 14Z"
+          fill="currentColor"
+        />
       </svg>
     );
   }
@@ -105,6 +116,7 @@ export function Sidebar(props: {
 
   const topNav: Array<{ href: string; label: string; icon: IconName; roles?: Role[] }> = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+    { href: "/profile", label: "Profile", icon: "profile" },
     ...(canManageUsers(role)
       ? [{ href: "/users", label: "Users & roles" as const, icon: "users" as const }]
       : []),
@@ -160,14 +172,20 @@ export function Sidebar(props: {
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-hidden rounded-r-[30px] bg-[#236d88] md:block">
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="bg-[#1f2544] px-5 pb-6 pt-4">
+        <Link
+          href="/profile"
+          className="block bg-[#1f2544] px-5 pb-6 pt-4 outline-none transition hover:bg-[#252b4d] focus-visible:ring-2 focus-visible:ring-white/40"
+        >
           <div className="mx-auto mt-5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-[#d9e5ed] bg-[#44638c] text-3xl font-bold text-white">
             {initials(props.userName)}
           </div>
           <div className="mt-5 text-center text-xs font-bold tracking-wide text-[#f4f8ff]">
             {(props.userName ?? "Church Admin").toUpperCase()}
           </div>
-        </div>
+          <p className="mt-1 text-center text-[10px] font-medium text-[#a8b8d4]">
+            View profile
+          </p>
+        </Link>
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-3">
           <ul className="space-y-2.5">

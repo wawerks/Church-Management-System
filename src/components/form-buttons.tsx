@@ -38,6 +38,7 @@ export function SubmitButton({
 }: SubmitButtonProps) {
   const { pending } = useFormStatus();
   const isBusy = Boolean(pending || disabled);
+  const showPendingText = pendingLabel.trim().length > 0;
   return (
     <button
       type="submit"
@@ -47,14 +48,58 @@ export function SubmitButton({
       className={`${className} active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60`.trim()}
     >
       {pending ? (
-        <span className="inline-flex items-center justify-center gap-2">
+        <span
+          className={`flex w-full items-center justify-center ${showPendingText ? "gap-2" : ""}`}
+        >
           <InlineSpinner />
-          <span>{pendingLabel}</span>
+          {showPendingText ? <span>{pendingLabel}</span> : null}
         </span>
       ) : (
         children
       )}
     </button>
+  );
+}
+
+type DeleteSubmitButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> & {
+  pendingLabel?: string;
+  children?: React.ReactNode;
+  confirmMessage?: string;
+};
+
+/** Destructive submit (server actions): pill shape, red fill; pending state is spinner only by default. */
+export function DeleteSubmitButton({
+  children = "Delete",
+  pendingLabel = "",
+  confirmMessage = "Are you sure you want to delete this item?",
+  className = "",
+  disabled,
+  onClick,
+  onClickCapture,
+  ...rest
+}: DeleteSubmitButtonProps) {
+  return (
+    <SubmitButton
+      pendingLabel={pendingLabel}
+      disabled={disabled}
+      onClickCapture={(e) => {
+        if (!window.confirm(confirmMessage)) {
+          e.preventDefault();
+          return;
+        }
+        onClickCapture?.(e);
+      }}
+      onClick={(e) => {
+        onClick?.(e);
+      }}
+      className={`rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-red-700 ${className}`.trim()}
+      {...rest}
+    >
+      {children}
+    </SubmitButton>
   );
 }
 
@@ -108,7 +153,7 @@ export function GetSubmitButton({
       className={`${className} active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60`.trim()}
     >
       {pending ? (
-        <span className="inline-flex items-center justify-center gap-2">
+        <span className="flex w-full items-center justify-center gap-2">
           <InlineSpinner />
           <span>{pendingLabel}</span>
         </span>

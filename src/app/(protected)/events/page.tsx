@@ -1,15 +1,12 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateEvents } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/enums";
 import { deleteEventAction } from "./actions";
-import {
-  GetSubmitButton,
-  PendingGetForm,
-  SubmitButton,
-} from "@/components/form-buttons";
+import { GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
 import type { Prisma } from "@/generated/prisma/client";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { AddEventModal } from "@/components/AddEventModal";
 
 function formatDate(d: Date) {
   return d.toLocaleDateString();
@@ -57,7 +54,7 @@ export default async function EventsPage(props: {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -84,12 +81,7 @@ export default async function EventsPage(props: {
             </GetSubmitButton>
           </PendingGetForm>
           {canEdit ? (
-            <Link
-              href="/events/new"
-              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-            >
-              + Add Event
-            </Link>
+            <AddEventModal />
           ) : null}
         </div>
       </div>
@@ -138,24 +130,13 @@ export default async function EventsPage(props: {
                     </td>
                     {canEdit ? (
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/events/${e.id}/edit`}
-                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            Edit
-                          </Link>
-                          <form
-                            action={deleteEventAction.bind(null, e.id)}
-                          >
-                            <SubmitButton
-                              pendingLabel="Deleting…"
-                              className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                            >
-                              Delete
-                            </SubmitButton>
-                          </form>
-                        </div>
+                        <RowActionsMenu
+                          rowId={e.id}
+                          editHref={`/events/${e.id}/edit`}
+                          deleteAction={deleteEventAction.bind(null, e.id)}
+                          deleteLabel="Delete"
+                          deleteConfirmMessage="Permanently delete this event?"
+                        />
                       </td>
                     ) : null}
                   </tr>

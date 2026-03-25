@@ -117,7 +117,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h1 className="text-2xl font-semibold tracking-tight">
           Dashboard
         </h1>

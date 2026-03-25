@@ -20,7 +20,9 @@ export async function logAction(params: LogActionParams) {
       action: params.action,
       entity: params.entity,
       entityId: params.entityId,
-      details: params.details,
+      // Prisma JSON fields are structurally typed; params.details is intentionally permissive.
+      // Cast keeps this runtime behavior unchanged while satisfying TS.
+      details: params.details as any,
     },
   });
 }

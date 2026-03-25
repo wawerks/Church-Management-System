@@ -9,6 +9,7 @@ function MobileNav(props: { role: Role }) {
   const role = props.role;
   const items: Array<{ href: string; label: string; roles?: Role[] }> = [
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/profile", label: "Profile" },
     ...(canManageUsers(role)
       ? [{ href: "/users", label: "Users" as const }]
       : []),

@@ -111,7 +111,7 @@ export default async function AttendancePage(props: {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Attendance</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -163,9 +163,9 @@ export default async function AttendancePage(props: {
         <div className="mb-3 text-sm font-semibold text-slate-800">
           Attendance History
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[min(40vh,22rem)] overflow-auto overscroll-contain">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_0_rgb(226_232_240)]">
               <tr className="text-left text-slate-700">
                 <th className="px-4 py-3 font-medium">Service</th>
                 <th className="px-4 py-3 font-medium">Present</th>

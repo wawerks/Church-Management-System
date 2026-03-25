@@ -5,11 +5,12 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
 import {
+  DeleteSubmitButton,
   GetSubmitButton,
   PendingGetForm,
-  SubmitButton,
 } from "@/components/form-buttons";
 import { deleteExpenseAction } from "./actions";
+import { AddExpenseModal } from "@/components/AddExpenseModal";
 
 function parseDateInput(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -55,6 +56,38 @@ export default async function ExpensesPage(props: {
   }
   const expenseTypeNames = expenseTypes.map((t) => t.name);
 
+  // Suggestions for the "Received By" picker in the add-expense modal.
+  let receivedBySuggestions: string[] = [];
+  try {
+    const [expenseRows, memberRows] = await Promise.all([
+      prisma.expense.findMany({
+        select: { receivedBy: true },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
+      prisma.member.findMany({
+        select: { firstName: true, lastName: true },
+        orderBy: { lastName: "asc" },
+        take: 200,
+      }),
+    ]);
+
+    const names = new Set<string>();
+    for (const e of expenseRows) {
+      const n = e.receivedBy.trim();
+      if (n.length > 0) names.add(n);
+    }
+    for (const m of memberRows) {
+      const full = `${m.firstName} ${m.lastName}`.trim();
+      if (full.length > 0) names.add(full);
+    }
+    receivedBySuggestions = Array.from(names).sort((a, b) =>
+      a.localeCompare(b),
+    );
+  } catch {
+    // ignore
+  }
+
   const typeRaw = searchParams?.type;
   const type =
     typeof typeRaw === "string" && expenseTypeNames.includes(typeRaw)
@@ -81,6 +114,7 @@ export default async function ExpensesPage(props: {
     id: string;
     type: string;
     claimedBy: string;
+    receivedBy: string;
     date: Date;
     amount: string;
   }> = [];
@@ -103,6 +137,7 @@ export default async function ExpensesPage(props: {
       id: r.id,
       type: r.type,
       claimedBy: r.claimedBy,
+      receivedBy: r.receivedBy,
       date: r.date,
       amount: r.amount.toString(),
     }));
@@ -130,12 +165,10 @@ export default async function ExpensesPage(props: {
                 Manage Expense Types
               </Link>
             ) : null}
-            <Link
-              href="/expenses/new"
-              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-            >
-              + Add Expense
-            </Link>
+            <AddExpenseModal
+              expenseTypes={expenseTypes}
+              receivedBySuggestions={receivedBySuggestions}
+            />
           </div>
         ) : null}
       </div>
@@ -219,57 +252,58 @@ export default async function ExpensesPage(props: {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr className="text-left text-slate-700">
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Claimed By</th>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
-                {canEdit ? (
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={canEdit ? 5 : 4}
-                    className="px-4 py-6 text-center text-slate-500"
-                  >
-                    No expense transactions found.
-                  </td>
+        <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-slate-700">
+                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">Claimed By</th>
+                  <th className="px-4 py-3 font-medium">Received By</th>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  {canEdit ? (
+                    <th className="px-4 py-3 font-medium">Actions</th>
+                  ) : null}
                 </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3">{r.type}</td>
-                    <td className="px-4 py-3">{r.claimedBy}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {r.date.toLocaleDateString()}
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={canEdit ? 6 : 5}
+                      className="px-4 py-6 text-center text-slate-500"
+                    >
+                      No expense transactions found.
                     </td>
-                    <td className="px-4 py-3 font-semibold">
-                      {formatMoney(Number(r.amount))}
-                    </td>
-                    {canEdit ? (
-                      <td className="px-4 py-3">
-                        <form action={deleteExpenseAction.bind(null, r.id)}>
-                          <SubmitButton
-                            pendingLabel="Deleting..."
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                          >
-                            Delete
-                          </SubmitButton>
-                        </form>
-                      </td>
-                    ) : null}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  rows.map((r) => (
+                    <tr key={r.id} className="border-t border-slate-100">
+                      <td className="px-4 py-3">{r.type}</td>
+                      <td className="px-4 py-3">{r.claimedBy}</td>
+                      <td className="px-4 py-3">{r.receivedBy}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {r.date.toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatMoney(Number(r.amount))}
+                      </td>
+                      {canEdit ? (
+                        <td className="px-4 py-3">
+                          <form
+                            action={deleteExpenseAction.bind(null, r.id)}
+                          >
+                            <DeleteSubmitButton />
+                          </form>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

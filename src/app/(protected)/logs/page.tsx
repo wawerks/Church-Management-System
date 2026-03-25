@@ -1,6 +1,8 @@
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
+import { DeleteSubmitButton } from "@/components/form-buttons";
+import { deleteActionLogAction } from "./actions";
 
 function formatDetails(details: unknown) {
   if (!details) return "—";
@@ -47,7 +49,7 @@ export default async function LogsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h1 className="text-2xl font-semibold">Action Logs</h1>
         <p className="mt-1 text-sm text-slate-600">Audit trail of user actions across the system.</p>
       </div>
@@ -68,12 +70,13 @@ export default async function LogsPage() {
                 <th className="px-4 py-3 font-medium">Action</th>
                 <th className="px-4 py-3 font-medium">Entity</th>
                 <th className="px-4 py-3 font-medium">Details</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                     No logs yet.
                   </td>
                 </tr>
@@ -100,6 +103,11 @@ export default async function LogsPage() {
                       <pre className="whitespace-pre-wrap break-all font-mono">
                         {formatDetails(log.details)}
                       </pre>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <form action={deleteActionLogAction.bind(null, log.id)}>
+                        <DeleteSubmitButton />
+                      </form>
                     </td>
                   </tr>
                 ))

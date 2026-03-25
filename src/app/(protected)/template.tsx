@@ -8,9 +8,13 @@ export default function ProtectedTemplate({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const disablePageAnimation = pathname === "/profile/edit";
+  const className = disablePageAnimation
+    ? "min-h-full"
+    : "page-transition min-h-full";
 
   return (
-    <div key={pathname} className="page-transition min-h-full">
+    <div key={pathname} className={className}>
       {children}
     </div>
   );

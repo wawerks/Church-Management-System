@@ -5,11 +5,12 @@ import { prisma } from "@/lib/prisma";
 import type { Role, DonationType } from "@/generated/prisma/enums";
 import { deleteDonationAction } from "./actions";
 import {
+  DeleteSubmitButton,
   GetSubmitButton,
   PendingGetForm,
-  SubmitButton,
 } from "@/components/form-buttons";
 import type { Prisma } from "@/generated/prisma/client";
+import { AddDonationModal } from "@/components/AddDonationModal";
 
 function parseDateInput(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -59,6 +60,22 @@ export default async function DonationsPage(props: {
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
   const searchParams = await props.searchParams;
+
+  // Suggestions for the "Member / Donator" picker.
+  let memberSuggestions: Array<{ id: string; name: string }> = [];
+  try {
+    const list = await prisma.member.findMany({
+      orderBy: { lastName: "asc" },
+      select: { id: true, firstName: true, lastName: true },
+      take: 250,
+    });
+    memberSuggestions = list.map((m) => ({
+      id: m.id,
+      name: `${m.firstName} ${m.lastName}`.trim(),
+    }));
+  } catch {
+    // ignore
+  }
 
   const today = new Date();
 
@@ -155,7 +172,7 @@ export default async function DonationsPage(props: {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Donations</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -165,12 +182,7 @@ export default async function DonationsPage(props: {
           </p>
         </div>
         {canEdit ? (
-          <Link
-            href="/donations/new"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            + Add Donation
-          </Link>
+          <AddDonationModal members={memberSuggestions} />
         ) : null}
       </div>
 
@@ -324,12 +336,7 @@ export default async function DonationsPage(props: {
                         <form
                           action={deleteDonationAction.bind(null, d.id)}
                         >
-                          <SubmitButton
-                            pendingLabel="Deleting…"
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                          >
-                            Delete
-                          </SubmitButton>
+                          <DeleteSubmitButton />
                         </form>
                       </td>
                     ) : null}

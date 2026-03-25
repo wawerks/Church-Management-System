@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { canMutateMembers } from "@/lib/permissions";
 import { updateMemberAction } from "../../actions";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { SubmitButton } from "@/components/form-buttons";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 function toDateInputValue(d: Date | null | undefined) {
   if (!d) return "";
@@ -15,12 +15,12 @@ function toDateInputValue(d: Date | null | undefined) {
 }
 
 export default async function EditMemberPage(props: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const session = await requireSession();
   if (!canMutateMembers(session.role)) redirect("/members");
 
-  const { id } = props.params;
+  const { id } = await props.params;
 
   let member:
     | (Awaited<ReturnType<typeof prisma.member.findUnique>> & {
@@ -51,26 +51,27 @@ export default async function EditMemberPage(props: {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Edit Member</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Update member details and family group.
-          </p>
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Edit Member</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Update member details and family group.
+            </p>
+          </div>
+          <Link
+            href="/members"
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </Link>
         </div>
-        <Link
-          href="/members"
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Back
-        </Link>
-      </div>
 
-      <form
-        action={updateMemberAction.bind(null, member.id)}
-        className="space-y-5"
-      >
+        <form
+          action={updateMemberAction.bind(null, member.id)}
+          className="space-y-5"
+        >
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">
             <div className="mb-1 text-sm font-medium text-slate-700">
@@ -194,14 +195,16 @@ export default async function EditMemberPage(props: {
           >
             Cancel
           </Link>
-          <SubmitButton
+          <ConfirmSubmitButton
             pendingLabel="Saving…"
+            confirmMessage="Save changes to this member?"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Changes
-          </SubmitButton>
+          </ConfirmSubmitButton>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

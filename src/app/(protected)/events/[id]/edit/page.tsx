@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { updateEventAction } from "../../actions";
-import { SubmitButton } from "@/components/form-buttons";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { Role } from "@/generated/prisma/enums";
 
 function toDateInputValue(d: Date) {
@@ -11,11 +11,11 @@ function toDateInputValue(d: Date) {
 }
 
 export default async function EditEventPage(props: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   await requireRole(["ADMIN"] satisfies Role[]);
 
-  const eventId = props.params.id;
+  const { id: eventId } = await props.params;
 
   let event:
     | (Awaited<ReturnType<typeof prisma.event.findUnique>>)
@@ -94,12 +94,13 @@ export default async function EditEventPage(props: {
           >
             Cancel
           </Link>
-          <SubmitButton
+          <ConfirmSubmitButton
             pendingLabel="Saving…"
+            confirmMessage="Save changes to this event?"
             className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
           >
             Save Changes
-          </SubmitButton>
+          </ConfirmSubmitButton>
         </div>
       </form>
     </div>

@@ -45,25 +45,26 @@ export default async function NewDonationPage() {
           className="space-y-5"
         >
           <label className="block">
-            <div className="mb-1 text-sm font-medium text-slate-700">Member</div>
-            <select
-              name="memberId"
+            <div className="mb-1 text-sm font-medium text-slate-700">
+              Member / Donator
+            </div>
+            <input
+              name="memberName"
               required
+              list="member-name-options"
+              placeholder="Search or type a name…"
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select a member
-              </option>
+              autoComplete="off"
+            />
+            <datalist id="member-name-options">
               {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
+                <option key={m.id} value={m.name} />
               ))}
-            </select>
+            </datalist>
             {members.length === 0 ? (
               <div className="mt-2 text-sm text-amber-700">
-                Members not available yet (DB not ready).
+                Members not available yet (DB not ready). You can still type a
+                name.
               </div>
             ) : null}
           </label>

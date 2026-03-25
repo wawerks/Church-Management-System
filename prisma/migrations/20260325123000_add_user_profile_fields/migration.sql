@@ -1,0 +1,5 @@
+ALTER TABLE `User`
+  ADD COLUMN `phoneNumber` VARCHAR(191) NULL,
+  ADD COLUMN `address` VARCHAR(191) NULL,
+  ADD COLUMN `birthdate` DATETIME(3) NULL;
+

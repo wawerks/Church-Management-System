@@ -80,6 +80,38 @@ export default async function NewUserPage() {
           </select>
         </label>
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-sm font-medium text-slate-700">
+              Phone number
+            </div>
+            <input
+              name="phoneNumber"
+              type="tel"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              placeholder="Optional"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-sm font-medium text-slate-700">Birthday</div>
+            <input
+              name="birthdate"
+              type="date"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        <label className="block">
+          <div className="mb-1 text-sm font-medium text-slate-700">Address</div>
+          <input
+            name="address"
+            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            placeholder="Optional"
+          />
+        </label>
+
         <div className="flex justify-end gap-2 pt-2">
           <Link
             href="/users"

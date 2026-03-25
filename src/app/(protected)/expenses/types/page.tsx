@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { SubmitButton } from "@/components/form-buttons";
+import { DeleteSubmitButton, SubmitButton } from "@/components/form-buttons";
 import { createExpenseTypeAction, deleteExpenseTypeAction } from "./actions";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -18,7 +18,7 @@ export default async function ExpenseTypesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Expense Types</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -78,12 +78,7 @@ export default async function ExpenseTypesPage() {
                     <td className="px-4 py-3">{r.name}</td>
                     <td className="px-4 py-3">
                       <form action={deleteExpenseTypeAction.bind(null, r.id)}>
-                        <SubmitButton
-                          pendingLabel="Deleting..."
-                          className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
-                        >
-                          Delete
-                        </SubmitButton>
+                        <DeleteSubmitButton />
                       </form>
                     </td>
                   </tr>
