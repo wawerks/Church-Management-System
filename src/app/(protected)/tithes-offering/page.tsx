@@ -1,27 +1,94 @@
+import Link from "next/link";
 import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
 import { deleteServiceIncomeAction } from "./actions";
-import { DeleteSubmitButton } from "@/components/form-buttons";
+import { DeleteSubmitButton, GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
 import { AddServiceIncomeModal } from "@/components/AddServiceIncomeModal";
 
-export default async function TithesOfferingPage() {
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+export default async function TithesOfferingPage(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
+
+  const searchParams = await props.searchParams;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthNumber = now.getMonth() + 1; // 1-12
+
+  const yearRaw = searchParams?.year;
+  const monthRaw = searchParams?.month;
+  const hasAnyFilter = typeof yearRaw === "string" || typeof monthRaw === "string";
+
+  const selectedYear =
+    typeof yearRaw === "string" && /^\d{4}$/.test(yearRaw) ? Number(yearRaw) : currentYear;
+
+  const selectedMonth =
+    typeof monthRaw === "string" && monthRaw !== "all" && /^\d{1,2}$/.test(monthRaw)
+      ? (() => {
+          const m = Number(monthRaw);
+          return m >= 1 && m <= 12 ? pad2(m) : "all";
+        })()
+      : monthRaw === "all"
+        ? "all"
+        : "all";
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const selectionLabel =
+    !hasAnyFilter
+      ? "Overall"
+      : selectedMonth === "all"
+        ? String(selectedYear)
+        : `${monthNames[Number(selectedMonth) - 1]} ${selectedYear}`;
 
   let dbReady = true;
   let rows: Array<{ id: string; serviceDate: Date; amount: string }> = [];
   let total = 0;
 
   try {
+    const rangeStart =
+      !hasAnyFilter
+        ? new Date(0)
+        : selectedMonth === "all"
+          ? new Date(selectedYear, 0, 1, 0, 0, 0, 0)
+          : new Date(Number(selectedYear), Number(selectedMonth) - 1, 1, 0, 0, 0, 0);
+
+    const rangeEnd =
+      !hasAnyFilter
+        ? new Date(3000, 0, 1, 0, 0, 0, 0)
+        : selectedMonth === "all"
+          ? new Date(selectedYear + 1, 0, 1, 0, 0, 0, 0)
+          : new Date(Number(selectedYear), Number(selectedMonth), 1, 0, 0, 0, 0);
+
     const [list, agg] = await Promise.all([
       prisma.serviceIncome.findMany({
+        where: { serviceDate: { gte: rangeStart, lt: rangeEnd } },
         orderBy: { serviceDate: "desc" },
         take: 50,
       }),
       prisma.serviceIncome.aggregate({
+        where: { serviceDate: { gte: rangeStart, lt: rangeEnd } },
         _sum: { amount: true },
       }),
     ]);
@@ -56,10 +123,63 @@ export default async function TithesOfferingPage() {
         </div>
       ) : null}
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <PendingGetForm method="GET" className="grid gap-3 md:grid-cols-5">
+          <label className="block md:col-span-2">
+            <div className="mb-1 text-sm font-medium text-slate-700">Year</div>
+            <select
+              name="year"
+              defaultValue={String(selectedYear)}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block md:col-span-2">
+            <div className="mb-1 text-sm font-medium text-slate-700">Month</div>
+            <select
+              name="month"
+              defaultValue={selectedMonth}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">All months</option>
+              {Array.from({ length: 12 }, (_, i) => {
+                const m = i + 1;
+                return (
+                  <option key={m} value={pad2(m)}>
+                    {monthNames[i]}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+
+          <div className="md:col-span-1 flex items-end gap-2">
+            <GetSubmitButton
+              pendingLabel="Applying..."
+              className="h-10 rounded-md bg-black px-3 text-sm font-medium text-white hover:bg-black/90"
+            >
+              Apply
+            </GetSubmitButton>
+            <Link
+              href="/tithes-offering"
+              className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center"
+            >
+              Reset
+            </Link>
+          </div>
+        </PendingGetForm>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-1">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-medium text-slate-600">
-            Total Tithes & Offering
+            Total Tithes & Offering ({selectionLabel})
           </div>
           <div className="mt-2 text-3xl font-semibold">
             {dbReady

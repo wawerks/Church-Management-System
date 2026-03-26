@@ -134,12 +134,15 @@ model ServiceIncome {
 }
 
 model Expense {
-  id     String   @id @default(cuid())
+  id     String @id @default(cuid())
   type   String
-  claimedBy String   @default("Unknown")
-  receivedBy String  @default("Unknown")
+  claimedBy String @default("Unknown")
+  receivedBy String @default("Unknown")
   date   DateTime
-  amount Decimal  @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(10, 2)
+  // Snapshot values used when amount is derived from monthly percentage allocation.
+  allocationPercentUsed Decimal? @db.Decimal(5, 2)
+  serviceIncomeMonthTotalUsed Decimal? @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -150,6 +153,10 @@ model Expense {
 model ExpenseType {
   id   String @id @default(cuid())
   name String @unique
+  // Admin-controlled percentage allocation of monthly Service Income.
+  allocationPercent Decimal @default(0) @db.Decimal(5, 2)
+  // Only types marked true participate in the required 100% allocation check.
+  isAllocatedFromServiceIncome Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

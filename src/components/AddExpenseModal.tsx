@@ -1,32 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createExpenseAction } from "../app/(protected)/expenses/actions";
 import { SubmitButton } from "./form-buttons";
-import type { Role } from "@/generated/prisma/enums";
 
-type ExpenseType = { id: string; name: string };
+type ExpenseType = {
+  id: string;
+  name: string;
+  allocationPercent: number;
+  isAllocatedFromServiceIncome: boolean;
+};
+
+function getMonthKey(dateInput: string) {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 export function AddExpenseModal({
   expenseTypes,
   receivedBySuggestions,
+  serviceIncomeTotalsByMonth,
+  budgetMonth,
+  spentByTypeForBudgetMonth,
 }: {
   expenseTypes: ExpenseType[];
   receivedBySuggestions: string[];
+  serviceIncomeTotalsByMonth: Record<string, number>;
+  budgetMonth?: string; // Format: YYYY-MM (from the Expenses page Budget Month filter)
+  spentByTypeForBudgetMonth?: Record<string, number>; // key: expense type name
 }) {
   type ModalState = "closed" | "opening" | "open" | "closing";
   const [modalState, setModalState] = useState<ModalState>("closed");
 
+  const defaultDate = budgetMonth ? `${budgetMonth}-01` : "";
+
   const [type, setType] = useState(expenseTypes[0]?.name ?? "");
   const [receivedBy, setReceivedBy] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(defaultDate);
   const [amount, setAmount] = useState("");
+  const [useSuggestedAmount, setUseSuggestedAmount] = useState(true);
+
+  const selectedType = expenseTypes.find((t) => t.name === type);
+  const monthKey = getMonthKey(date);
+  const monthTotal = monthKey ? (serviceIncomeTotalsByMonth[monthKey] ?? 0) : 0;
+  const suggestedAmount = (() => {
+    if (!selectedType?.isAllocatedFromServiceIncome || !monthKey) return null;
+
+    const computed = (monthTotal * selectedType.allocationPercent) / 100;
+    if (!budgetMonth || monthKey !== budgetMonth) return computed > 0 ? computed : null;
+
+    const spent = spentByTypeForBudgetMonth?.[selectedType.name] ?? 0;
+    const remaining = computed - spent;
+    return remaining > 0 ? remaining : null;
+  })();
+  const usingAutoCompute = Boolean(
+    useSuggestedAmount && selectedType?.isAllocatedFromServiceIncome,
+  );
+
+  // When the modal opens with a pre-filled date (e.g. budget month),
+  // immediately compute and populate the amount if auto-compute is enabled.
+  useEffect(() => {
+    if (!usingAutoCompute) return;
+    if (suggestedAmount === null) {
+      setAmount("");
+      return;
+    }
+    setAmount(suggestedAmount.toFixed(2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usingAutoCompute, suggestedAmount]);
 
   function reset() {
     setType(expenseTypes[0]?.name ?? "");
     setReceivedBy("");
-    setDate("");
+    setDate(defaultDate);
     setAmount("");
+    setUseSuggestedAmount(true);
   }
 
   function openModal() {
@@ -94,6 +144,9 @@ export function AddExpenseModal({
             </div>
 
             <form action={createExpenseAction} className="space-y-5">
+              {budgetMonth ? (
+                <input type="hidden" name="budgetMonth" value={budgetMonth} />
+              ) : null}
               <label className="block">
                 <div className="mb-1 text-sm font-medium text-slate-700">
                   Expense Type
@@ -102,7 +155,29 @@ export function AddExpenseModal({
                   name="type"
                   required
                   value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    setType(nextType);
+                    if (useSuggestedAmount) {
+                      const nextSelected = expenseTypes.find((t) => t.name === nextType);
+                      if (!nextSelected?.isAllocatedFromServiceIncome || !monthKey) {
+                        setAmount("");
+                        return;
+                      }
+
+                      const computed =
+                        (monthTotal * nextSelected.allocationPercent) / 100;
+                      if (!budgetMonth || monthKey !== budgetMonth) {
+                        setAmount(computed > 0 ? computed.toFixed(2) : "");
+                        return;
+                      }
+
+                      const spent =
+                        spentByTypeForBudgetMonth?.[nextSelected.name] ?? 0;
+                      const remaining = computed - spent;
+                      setAmount(remaining > 0 ? remaining.toFixed(2) : "");
+                    }
+                  }}
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   disabled={expenseTypes.length === 0}
                 >
@@ -151,9 +226,72 @@ export function AddExpenseModal({
                   required
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setDate(nextDate);
+                    if (useSuggestedAmount) {
+                      const nextMonthKey = getMonthKey(nextDate);
+                      const nextMonthTotal = nextMonthKey
+                        ? (serviceIncomeTotalsByMonth[nextMonthKey] ?? 0)
+                        : 0;
+
+                      if (!selectedType?.isAllocatedFromServiceIncome || !nextMonthKey) {
+                        setAmount("");
+                        return;
+                      }
+
+                      const computed =
+                        (nextMonthTotal * selectedType.allocationPercent) / 100;
+
+                      if (!budgetMonth || nextMonthKey !== budgetMonth) {
+                        setAmount(computed > 0 ? computed.toFixed(2) : "");
+                        return;
+                      }
+
+                      const spent =
+                        spentByTypeForBudgetMonth?.[selectedType.name] ?? 0;
+                      const remaining = computed - spent;
+                      setAmount(remaining > 0 ? remaining.toFixed(2) : "");
+                    }
+                  }}
                 />
               </label>
+
+              {selectedType?.isAllocatedFromServiceIncome ? (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    name="useSuggestedAmount"
+                    checked={useSuggestedAmount}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseSuggestedAmount(checked);
+                      if (checked && suggestedAmount !== null) {
+                        setAmount(suggestedAmount.toFixed(2));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Auto-compute amount from expense type allocation
+                </label>
+              ) : null}
+
+              {selectedType?.isAllocatedFromServiceIncome ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  {monthKey ? (
+                    <>
+                      Suggested amount:{" "}
+                      <span className="font-semibold text-slate-900">
+                        {suggestedAmount?.toFixed(2) ?? "0.00"}
+                      </span>{" "}
+                      ({selectedType.allocationPercent.toFixed(2)}% of {monthTotal.toFixed(2)} for{" "}
+                      {monthKey})
+                    </>
+                  ) : (
+                    <>Pick a date to preview the computed amount for that month.</>
+                  )}
+                </div>
+              ) : null}
 
               <label className="block">
                 <div className="mb-1 text-sm font-medium text-slate-700">
@@ -168,6 +306,7 @@ export function AddExpenseModal({
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  readOnly={usingAutoCompute}
                 />
               </label>
 

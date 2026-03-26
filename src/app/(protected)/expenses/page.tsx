@@ -4,13 +4,12 @@ import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
-import {
-  DeleteSubmitButton,
-  GetSubmitButton,
-  PendingGetForm,
-} from "@/components/form-buttons";
+import { DeleteSubmitButton } from "@/components/form-buttons";
 import { deleteExpenseAction } from "./actions";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
+import { ExpensesFilters } from "@/components/ExpensesFilters";
+
+export const dynamic = "force-dynamic";
 
 function parseDateInput(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -39,6 +38,30 @@ function formatMoney(value: number) {
   });
 }
 
+function toMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function parseMonthKey(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}$/.test(trimmed)) return null;
+  const year = Number(trimmed.slice(0, 4));
+  const month = Number(trimmed.slice(5, 7));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return null;
+  }
+  return trimmed;
+}
+
+function monthRange(monthKey: string) {
+  const year = Number(monthKey.slice(0, 4));
+  const monthIndex = Number(monthKey.slice(5, 7)) - 1;
+  const start = new Date(year, monthIndex, 1, 0, 0, 0, 0);
+  const end = new Date(year, monthIndex + 1, 1, 0, 0, 0, 0);
+  return { start, end };
+}
+
 export default async function ExpensesPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
@@ -47,14 +70,55 @@ export default async function ExpensesPage(props: {
   const canEdit = canMutateDonations(session.role);
   const searchParams = await props.searchParams;
   const isAdmin = session.role === "ADMIN";
+  const currentMonthKey = toMonthKey(new Date());
 
-  let expenseTypes: Array<{ id: string; name: string }> = [];
+  let expenseTypes: Array<{
+    id: string;
+    name: string;
+    allocationPercent: number;
+    isAllocatedFromServiceIncome: boolean;
+  }> = [];
+  let serviceIncomeTotalsByMonth: Record<string, number> = {};
+  let monthOptions: string[] = [currentMonthKey];
   try {
-    expenseTypes = await prisma.expenseType.findMany({ orderBy: { name: "asc" } });
+    const [types, serviceIncomes, allocatedExpenseMonths] = await Promise.all([
+      prisma.expenseType.findMany({ orderBy: { name: "asc" } }),
+      prisma.serviceIncome.findMany({
+        select: { serviceDate: true, amount: true },
+        orderBy: { serviceDate: "desc" },
+      }),
+      prisma.expense.findMany({
+        where: { allocationPercentUsed: { not: null } },
+        select: { date: true },
+        orderBy: { date: "desc" },
+      }),
+    ]);
+    expenseTypes = types.map((t) => ({
+      id: t.id,
+      name: t.name,
+      allocationPercent: Number(t.allocationPercent),
+      isAllocatedFromServiceIncome: t.isAllocatedFromServiceIncome,
+    }));
+    const totals: Record<string, number> = {};
+    for (const row of serviceIncomes) {
+      const key = `${row.serviceDate.getFullYear()}-${String(
+        row.serviceDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      totals[key] = (totals[key] ?? 0) + Number(row.amount);
+    }
+    serviceIncomeTotalsByMonth = totals;
+    const monthSet = new Set<string>([currentMonthKey]);
+    for (const row of serviceIncomes) monthSet.add(toMonthKey(row.serviceDate));
+    for (const row of allocatedExpenseMonths) monthSet.add(toMonthKey(row.date));
+    monthOptions = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
   } catch {
     // ignore
   }
   const expenseTypeNames = expenseTypes.map((t) => t.name);
+  const totalEnabledAllocationPercent = expenseTypes
+    .filter((t) => t.isAllocatedFromServiceIncome)
+    .reduce((sum, t) => sum + t.allocationPercent, 0);
+  const isAllocationPercentValid = Math.abs(totalEnabledAllocationPercent - 100) < 0.0001;
 
   // Suggestions for the "Received By" picker in the add-expense modal.
   let receivedBySuggestions: string[] = [];
@@ -94,22 +158,43 @@ export default async function ExpensesPage(props: {
       ? typeRaw
       : undefined;
 
+  const viewRaw = searchParams?.view;
+  const view =
+    typeof viewRaw === "string" && ["summary", "balance", "expenses"].includes(viewRaw)
+      ? viewRaw
+      : "summary";
+
   const from = parseDateInput(searchParams?.from);
   const to = parseDateInput(searchParams?.to);
+  const budgetMonth = parseMonthKey(searchParams?.budgetMonth) ?? currentMonthKey;
+  const { start: budgetMonthStart, end: budgetMonthEnd } = monthRange(budgetMonth);
 
-  let where: Prisma.ExpenseWhereInput = {};
-  if (type) where = { ...where, type };
-  if (from || to) {
-    where = {
-      ...where,
-      date: {
-        ...(from ? { gte: startOfDay(from) } : {}),
-        ...(to ? { lte: endOfDay(to) } : {}),
-      },
-    };
+  // Always constrain the table + totals to the selected budget month.
+  // If "From/To" are provided, we further narrow inside that budget month.
+  const budgetDateFilter: Prisma.ExpenseWhereInput["date"] = {
+    gte: budgetMonthStart,
+    lt: budgetMonthEnd,
+  };
+  if (from) {
+    const fromGte = startOfDay(from);
+    if (fromGte.getTime() > budgetMonthStart.getTime()) {
+      budgetDateFilter.gte = fromGte;
+    }
+  }
+  if (to) {
+    const toExclusive = new Date(endOfDay(to).getTime() + 1);
+    if (toExclusive.getTime() < budgetMonthEnd.getTime()) {
+      budgetDateFilter.lt = toExclusive;
+    }
   }
 
+  const where: Prisma.ExpenseWhereInput = {
+    ...(type ? { type } : {}),
+    date: budgetDateFilter,
+  };
+
   let dbReady = true;
+  let dbErrorMessage: string | null = null;
   let rows: Array<{
     id: string;
     type: string;
@@ -119,9 +204,44 @@ export default async function ExpensesPage(props: {
     amount: string;
   }> = [];
   let total = 0;
+  let selectedMonthServiceIncomeTotal = 0;
+  let selectedMonthAllocatedBudget = 0;
+  let selectedMonthAllocatedExpenses = 0;
+  let carryOverBeforeSelectedMonth = 0;
+  let selectedMonthRemainingBudget = 0;
+  let summaryRows: Array<{
+    month: string;
+    income: number;
+    expenses: number;
+    remaining: number;
+  }> = [];
+  let summaryTotalMonthlyRemaining = 0;
+  let allocationShares: Array<{
+    id: string;
+    name: string;
+    allocationPercent: number;
+    amount: number;
+  }> = [];
+  let spentByTypeForBudgetMonth: Record<string, number> = {};
 
   try {
-    const [list, agg] = await Promise.all([
+    const spentWhere = {
+      date: {
+        gte: budgetMonthStart,
+        lt: budgetMonthEnd,
+      },
+    };
+
+    const [
+      list,
+      agg,
+      monthIncomeAgg,
+      monthAllocatedExpenseAgg,
+      prevIncomeAgg,
+      prevAllocatedExpenseAgg,
+      monthExpensesByType,
+      allExpensesForSummary,
+    ] = await Promise.all([
       prisma.expense.findMany({
         where,
         orderBy: { date: "desc" },
@@ -130,6 +250,50 @@ export default async function ExpensesPage(props: {
       prisma.expense.aggregate({
         _sum: { amount: true },
         where,
+      }),
+      prisma.serviceIncome.aggregate({
+        _sum: { amount: true },
+        where: {
+          serviceDate: {
+            gte: budgetMonthStart,
+            lt: budgetMonthEnd,
+          },
+        },
+      }),
+      prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: {
+          date: {
+            gte: budgetMonthStart,
+            lt: budgetMonthEnd,
+          },
+          allocationPercentUsed: { not: null },
+        },
+      }),
+      prisma.serviceIncome.aggregate({
+        _sum: { amount: true },
+        where: {
+          serviceDate: {
+            lt: budgetMonthStart,
+          },
+        },
+      }),
+      prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: {
+          date: {
+            lt: budgetMonthStart,
+          },
+          allocationPercentUsed: { not: null },
+        },
+      }),
+      prisma.expense.findMany({
+        where: spentWhere,
+        select: { type: true, amount: true },
+      }),
+      prisma.expense.findMany({
+        select: { date: true, amount: true },
+        orderBy: { date: "desc" },
       }),
     ]);
 
@@ -142,13 +306,78 @@ export default async function ExpensesPage(props: {
       amount: r.amount.toString(),
     }));
     total = Number(agg._sum.amount ?? 0);
-  } catch {
+    selectedMonthServiceIncomeTotal = Number(monthIncomeAgg._sum.amount ?? 0);
+    selectedMonthAllocatedBudget =
+      (selectedMonthServiceIncomeTotal * totalEnabledAllocationPercent) / 100;
+    selectedMonthAllocatedExpenses = Number(monthAllocatedExpenseAgg._sum.amount ?? 0);
+    const previousIncomeTotal = Number(prevIncomeAgg._sum.amount ?? 0);
+    const previousAllocatedBudget = (previousIncomeTotal * totalEnabledAllocationPercent) / 100;
+    const previousAllocatedExpenses = Number(prevAllocatedExpenseAgg._sum.amount ?? 0);
+    carryOverBeforeSelectedMonth = previousAllocatedBudget - previousAllocatedExpenses;
+    selectedMonthRemainingBudget =
+      carryOverBeforeSelectedMonth +
+      selectedMonthAllocatedBudget -
+      selectedMonthAllocatedExpenses;
+
+    const expenseByMonth = new Map<string, number>();
+    for (const row of allExpensesForSummary) {
+      const key = toMonthKey(row.date);
+      expenseByMonth.set(key, (expenseByMonth.get(key) ?? 0) + Number(row.amount));
+    }
+
+    const months = new Set<string>([
+      ...Object.keys(serviceIncomeTotalsByMonth),
+      ...Array.from(expenseByMonth.keys()),
+    ]);
+
+    summaryRows = Array.from(months)
+      .sort((a, b) => b.localeCompare(a))
+      .map((month) => {
+        const income = serviceIncomeTotalsByMonth[month] ?? 0;
+        const expenses = expenseByMonth.get(month) ?? 0;
+        const remaining = income - expenses;
+        return { month, income, expenses, remaining };
+      });
+
+    summaryTotalMonthlyRemaining = summaryRows.reduce((sum, row) => sum + row.remaining, 0);
+
+    const spentByType = new Map<string, number>();
+    for (const e of monthExpensesByType) {
+      const prev = spentByType.get(e.type) ?? 0;
+      spentByType.set(e.type, prev + Number(e.amount));
+    }
+
+    spentByTypeForBudgetMonth = Object.fromEntries(spentByType.entries());
+
+    allocationShares = expenseTypes
+      .filter((t) => t.isAllocatedFromServiceIncome)
+      .map((t) => {
+        const computedShare = (selectedMonthServiceIncomeTotal * t.allocationPercent) / 100;
+        const spentShare = spentByType.get(t.name) ?? 0;
+        return {
+          id: t.id,
+          name: t.name,
+          allocationPercent: t.allocationPercent,
+          // Remaining share after subtracting already-created expenses this budget month.
+          amount: Number((computedShare - spentShare).toFixed(2)),
+        };
+      });
+  } catch (error) {
     dbReady = false;
+    dbErrorMessage = error instanceof Error ? error.message : "Unknown database error";
   }
+
+  const totalByType = Object.values(
+    rows.reduce((acc, r) => {
+      const prev = acc[r.type] ?? 0;
+      acc[r.type] = prev + Number(r.amount);
+      return acc;
+    }, {} as Record<string, number>),
+  ).reduce((entries, _v) => entries, [] as number[]);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Expenses</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -168,144 +397,266 @@ export default async function ExpensesPage(props: {
             <AddExpenseModal
               expenseTypes={expenseTypes}
               receivedBySuggestions={receivedBySuggestions}
+              serviceIncomeTotalsByMonth={serviceIncomeTotalsByMonth}
+              budgetMonth={budgetMonth}
+              spentByTypeForBudgetMonth={spentByTypeForBudgetMonth}
             />
           </div>
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <PendingGetForm method="GET" className="grid gap-3 md:grid-cols-4">
-          <label className="block">
-            <div className="mb-1 text-sm font-medium text-slate-700">Type</div>
-            <select
-              name="type"
-              defaultValue={type ?? ""}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All types</option>
-              {expenseTypes.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <div className="mb-1 text-sm font-medium text-slate-700">From</div>
-            <input
-              type="date"
-              name="from"
-              defaultValue={
-                typeof searchParams?.from === "string"
-                  ? searchParams.from
-                  : undefined
-              }
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-
-          <label className="block">
-            <div className="mb-1 text-sm font-medium text-slate-700">To</div>
-            <input
-              type="date"
-              name="to"
-              defaultValue={
-                typeof searchParams?.to === "string" ? searchParams.to : undefined
-              }
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            />
-          </label>
-
-          <div className="flex items-end gap-2">
-            <GetSubmitButton
-              pendingLabel="Applying..."
-              className="h-10 rounded-md bg-black px-3 text-sm font-medium text-white hover:bg-black/90"
-            >
-              Apply
-            </GetSubmitButton>
-            <Link
-              href="/expenses"
-              className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center"
-            >
-              Reset
-            </Link>
-          </div>
-        </PendingGetForm>
+      <div className="rounded-xl border border-slate-200 bg-white p-2">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["balance", "Monthly Allocation Balance"],
+              ["expenses", "Expenses"],
+              ["summary", "Summary"],
+            ] as const
+          ).map(([key, label]) => {
+            const params = new URLSearchParams();
+            if (key !== "summary" && type) params.set("type", type);
+            if (key !== "summary") params.set("budgetMonth", budgetMonth);
+            params.set("view", key);
+            return (
+              <Link
+                key={key}
+                href={`/expenses?${params.toString()}`}
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  view === key
+                    ? "bg-black text-white"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+                aria-current={view === key ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
+
+      {view !== "summary" ? (
+        <ExpensesFilters
+          expenseTypes={expenseTypes}
+          type={type}
+          budgetMonth={budgetMonth}
+          monthOptions={monthOptions}
+          view={view}
+        />
+      ) : null}
 
       {!dbReady ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Database isn&apos;t ready yet. Set up MySQL + run Prisma migrations.
+          Database error while loading expenses.
+          {dbErrorMessage ? <div className="mt-1">Details: {dbErrorMessage}</div> : null}
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-1">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">
-            Total Expenses (Filtered)
+      {view === "summary" ? (
+        <div className="space-y-4 w-full">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="text-sm font-medium text-slate-600">
+              Total Monthly Remaining Amount
+            </div>
+            <div
+              className={`mt-2 text-3xl font-semibold ${
+                summaryTotalMonthlyRemaining >= 0 ? "text-emerald-700" : "text-rose-700"
+              }`}
+            >
+              {dbReady ? formatMoney(summaryTotalMonthlyRemaining) : "-"}
+            </div>
           </div>
-          <div className="mt-2 text-3xl font-semibold">
-            {dbReady ? formatMoney(total) : "-"}
-          </div>
-        </div>
-      </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-slate-700">
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Claimed By</th>
-                  <th className="px-4 py-3 font-medium">Received By</th>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Amount</th>
-                  {canEdit ? (
-                    <th className="px-4 py-3 font-medium">Actions</th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={canEdit ? 6 : 5}
-                      className="px-4 py-6 text-center text-slate-500"
-                    >
-                      No expense transactions found.
-                    </td>
+          <div className="rounded-xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-slate-700">
+                    <th className="px-4 py-3 font-medium">Month</th>
+                    <th className="px-4 py-3 font-medium">Monthly Income</th>
+                    <th className="px-4 py-3 font-medium">Monthly Expenses</th>
+                    <th className="px-4 py-3 font-medium">Remaining Amount</th>
                   </tr>
-                ) : (
-                  rows.map((r) => (
-                    <tr key={r.id} className="border-t border-slate-100">
-                      <td className="px-4 py-3">{r.type}</td>
-                      <td className="px-4 py-3">{r.claimedBy}</td>
-                      <td className="px-4 py-3">{r.receivedBy}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {r.date.toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        {formatMoney(Number(r.amount))}
-                      </td>
-                      {canEdit ? (
-                        <td className="px-4 py-3">
-                          <form
-                            action={deleteExpenseAction.bind(null, r.id)}
-                          >
-                            <DeleteSubmitButton />
-                          </form>
+                </thead>
+                <tbody>
+                  {dbReady && summaryRows.length > 0 ? (
+                    summaryRows.map((row) => (
+                      <tr key={row.month} className="border-t border-slate-100">
+                        <td className="px-4 py-3">{row.month}</td>
+                        <td className="px-4 py-3">{formatMoney(row.income)}</td>
+                        <td className="px-4 py-3">{formatMoney(row.expenses)}</td>
+                        <td
+                          className={`px-4 py-3 font-semibold ${
+                            row.remaining >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(row.remaining)}
                         </td>
-                      ) : null}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
+                        No monthly summary data found.
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
+
+      {view === "balance" ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 w-full">
+          <div className="text-sm font-medium text-slate-600">
+            Monthly Allocation Balance ({budgetMonth})
+          </div>
+          <div className="mt-2 text-sm text-slate-600">
+            Budget from service income ({totalEnabledAllocationPercent.toFixed(2)}%)
+          </div>
+          {!isAllocationPercentValid ? (
+            <div className="mt-2 inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+              Allocation config warning: enabled expense types must total exactly 100%.
+            </div>
+          ) : null}
+          <div className="mt-1 text-2xl font-semibold text-slate-900">
+            {dbReady ? formatMoney(selectedMonthAllocatedBudget) : "-"}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+              Income: {dbReady ? formatMoney(selectedMonthServiceIncomeTotal) : "-"}
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+              Allocated Expenses:{" "}
+              {dbReady ? formatMoney(selectedMonthAllocatedExpenses) : "-"}
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+              Carry-over In:{" "}
+              {dbReady ? formatMoney(carryOverBeforeSelectedMonth) : "-"}
+            </div>
+            <div
+              className={`rounded-md border p-2 ${
+                !dbReady
+                  ? "border-slate-200 bg-slate-50"
+                  : selectedMonthRemainingBudget >= 0
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-rose-200 bg-rose-50 text-rose-900"
+              }`}
+            >
+              Remaining:{" "}
+              {dbReady ? formatMoney(selectedMonthRemainingBudget) : "-"}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="text-xs font-medium text-slate-600">
+              Allocated Shares from Tithes & Offering ({budgetMonth})
+            </div>
+            <div className="mt-2 space-y-2">
+              {dbReady ? (
+                allocationShares.length === 0 ? (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+                    No enabled expense types for allocation.
+                  </div>
+                ) : (
+                  allocationShares.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-800">
+                          {s.name}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          {s.allocationPercent.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-slate-900">
+                          {formatMoney(s.amount)}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )
+              ) : (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+                  -
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {view === "expenses" ? (
+        <div className="space-y-4 w-full">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="text-sm font-medium text-slate-600">
+              Total Expenses (Filtered)
+            </div>
+            <div className="mt-2 text-3xl font-semibold">
+              {dbReady ? formatMoney(total) : "-"}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-slate-700">
+                    <th className="px-4 py-3 font-medium">Type</th>
+                    <th className="px-4 py-3 font-medium">Received By</th>
+                    <th className="px-4 py-3 font-medium">Date</th>
+                    <th className="px-4 py-3 font-medium">Amount</th>
+                    {canEdit ? (
+                      <th className="px-4 py-3 font-medium">Actions</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={canEdit ? 5 : 4}
+                        className="px-4 py-6 text-center text-slate-500"
+                      >
+                        No expense transactions found.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((r) => (
+                      <tr key={r.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3">{r.type}</td>
+                        <td className="px-4 py-3">{r.receivedBy}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.date.toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 font-semibold">
+                          {formatMoney(Number(r.amount))}
+                        </td>
+                        {canEdit ? (
+                          <td className="px-4 py-3">
+                            <form action={deleteExpenseAction.bind(null, r.id)}>
+                              <DeleteSubmitButton />
+                            </form>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

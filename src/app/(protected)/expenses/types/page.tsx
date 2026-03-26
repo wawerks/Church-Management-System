@@ -1,17 +1,31 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { DeleteSubmitButton, SubmitButton } from "@/components/form-buttons";
-import { createExpenseTypeAction, deleteExpenseTypeAction } from "./actions";
+import { SubmitButton } from "@/components/form-buttons";
+import {
+  createExpenseTypeAction,
+} from "./actions";
 import type { Role } from "@/generated/prisma/enums";
+import { ExpenseTypeAllocationEditor } from "@/components/ExpenseTypeAllocationEditor";
 
 export default async function ExpenseTypesPage() {
   await requireRole(["ADMIN"] satisfies Role[]);
 
   let dbReady = true;
-  let rows: Array<{ id: string; name: string }> = [];
+  let rows: Array<{
+    id: string;
+    name: string;
+    allocationPercent: number;
+    isAllocatedFromServiceIncome: boolean;
+  }> = [];
   try {
-    rows = await prisma.expenseType.findMany({ orderBy: { name: "asc" } });
+    const dbRows = await prisma.expenseType.findMany({ orderBy: { name: "asc" } });
+    rows = dbRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      allocationPercent: Number(row.allocationPercent),
+      isAllocatedFromServiceIncome: row.isAllocatedFromServiceIncome,
+    }));
   } catch {
     dbReady = false;
   }
@@ -22,7 +36,7 @@ export default async function ExpenseTypesPage() {
         <div>
           <h1 className="text-2xl font-semibold">Expense Types</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Admin-only list of expense kinds available to users.
+            Admin-only list of expense kinds and monthly allocation config.
           </p>
         </div>
         <Link
@@ -40,7 +54,11 @@ export default async function ExpenseTypesPage() {
       ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <form action={createExpenseTypeAction} className="flex flex-col gap-2 sm:flex-row">
+        <form
+          action={createExpenseTypeAction}
+          className="flex flex-col gap-2 sm:flex-row"
+          id="expense-types-add-type"
+        >
           <input
             name="name"
             required
@@ -56,38 +74,7 @@ export default async function ExpenseTypesPage() {
         </form>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr className="text-left text-slate-700">
-                <th className="px-4 py-3 font-medium">Type Name</th>
-                <th className="px-4 py-3 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={2} className="px-4 py-6 text-center text-slate-500">
-                    No expense types yet.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3">{r.name}</td>
-                    <td className="px-4 py-3">
-                      <form action={deleteExpenseTypeAction.bind(null, r.id)}>
-                        <DeleteSubmitButton />
-                      </form>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {dbReady ? <ExpenseTypeAllocationEditor rows={rows} /> : null}
     </div>
   );
 }
