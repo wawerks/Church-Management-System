@@ -4,10 +4,16 @@ import { Sidebar } from "@/components/Sidebar";
 import { LogoutButton } from "@/components/LogoutButton";
 import type { Role } from "@/generated/prisma/enums";
 import { canManageUsers } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
-function MobileNav(props: { role: Role }) {
+function MobileNav(props: { role: Role; pendingVoidCount: number }) {
   const role = props.role;
-  const items: Array<{ href: string; label: string; roles?: Role[] }> = [
+  const items: Array<{
+    href: string;
+    label: string;
+    roles?: Role[];
+    badge?: number;
+  }> = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/profile", label: "Profile" },
     ...(canManageUsers(role)
@@ -23,7 +29,15 @@ function MobileNav(props: { role: Role }) {
     { href: "/donations", label: "Donations", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     { href: "/expenses", label: "Expenses", roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"] },
     ...(canManageUsers(role)
-      ? [{ href: "/expenses/types", label: "Expense Types", roles: ["ADMIN"] as Role[] }]
+      ? [
+          { href: "/expenses/types", label: "Expense Types", roles: ["ADMIN"] as Role[] },
+          {
+            href: "/void-requests",
+            label: "Void approvals",
+            roles: ["ADMIN"] as Role[],
+            badge: props.pendingVoidCount,
+          },
+        ]
       : []),
     { href: "/events", label: "Events", roles: ["ADMIN", "PASTOR", "TREASURER"] },
     {
@@ -58,9 +72,14 @@ function MobileNav(props: { role: Role }) {
             <Link
               key={i.href}
               href={i.href}
-              className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="relative shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               {i.label}
+              {i.badge && i.badge > 0 ? (
+                <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                  {i.badge > 99 ? "99+" : i.badge}
+                </span>
+              ) : null}
             </Link>
           ))}
       </nav>
@@ -75,12 +94,27 @@ export default async function ProtectedLayout({
 }>) {
   const session = await requireSession();
 
+  let pendingVoidCount = 0;
+  if (session.role === "ADMIN") {
+    try {
+      pendingVoidCount = await prisma.voidRequest.count({
+        where: { status: "PENDING" },
+      });
+    } catch {
+      pendingVoidCount = 0;
+    }
+  }
+
   return (
     <div className="app-shell h-screen overflow-hidden">
       <div className="flex h-full">
-        <Sidebar role={session.role} userName={session.name} />
+        <Sidebar
+          role={session.role}
+          userName={session.name}
+          pendingVoidCount={pendingVoidCount}
+        />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <MobileNav role={session.role} />
+          <MobileNav role={session.role} pendingVoidCount={pendingVoidCount} />
           <main className="flex-1 overflow-y-auto p-4">{children}</main>
         </div>
       </div>

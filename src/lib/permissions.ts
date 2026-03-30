@@ -62,3 +62,13 @@ export function canExportAttendanceReports(role: Role) {
 export function canViewDashboardDonations(role: Role) {
   return role === "ADMIN" || role === "PASTOR" || role === "STAFF" || role === "TREASURER";
 }
+
+/** Admin can void financial rows immediately; others submit a request first. */
+export function canVoidFinancialDirectly(role: Role) {
+  return role === "ADMIN";
+}
+
+/** Submit a void proposal that requires admin approval. */
+export function canRequestFinancialVoid(role: Role) {
+  return role === "STAFF" || role === "TREASURER";
+}

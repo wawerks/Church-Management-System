@@ -62,15 +62,15 @@ export async function GET(req: Request) {
   try {
     const [donations, serviceIncome, expenses] = await Promise.all([
       prisma.donation.findMany({
-        where: { date: { gte: start, lte: end } },
+        where: { isDeleted: false, date: { gte: start, lte: end } },
         select: { date: true, amount: true },
       }),
       prisma.serviceIncome.findMany({
-        where: { serviceDate: { gte: start, lte: end } },
+        where: { isDeleted: false, serviceDate: { gte: start, lte: end } },
         select: { serviceDate: true, amount: true },
       }),
       prisma.expense.findMany({
-        where: { date: { gte: start, lte: end } },
+        where: { isDeleted: false, date: { gte: start, lte: end } },
         select: { type: true, amount: true, receivedBy: true },
       }),
     ]);

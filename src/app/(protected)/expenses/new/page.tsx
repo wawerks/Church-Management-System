@@ -16,6 +16,7 @@ export default async function NewExpensePage() {
     expenseTypes = await prisma.expenseType.findMany({ orderBy: { name: "asc" } });
     const [expenseRows, memberRows] = await Promise.all([
       prisma.expense.findMany({
+        where: { isDeleted: false },
         select: { receivedBy: true },
         orderBy: { createdAt: "desc" },
         take: 200,

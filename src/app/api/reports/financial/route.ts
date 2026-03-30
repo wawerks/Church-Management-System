@@ -86,17 +86,17 @@ async function financialData(params: URLSearchParams) {
   const end = endOfDay(toDate);
 
   const donations = await prisma.donation.findMany({
-    where: { date: { gte: start, lte: end } },
+    where: { isDeleted: false, date: { gte: start, lte: end } },
     select: { date: true, amount: true },
   });
 
   const serviceIncome = await prisma.serviceIncome.findMany({
-    where: { serviceDate: { gte: start, lte: end } },
+    where: { isDeleted: false, serviceDate: { gte: start, lte: end } },
     select: { serviceDate: true, amount: true },
   });
 
   const expenses = await prisma.expense.findMany({
-    where: { date: { gte: start, lte: end } },
+    where: { isDeleted: false, date: { gte: start, lte: end } },
     select: { type: true, amount: true, date: true, receivedBy: true },
   });
 

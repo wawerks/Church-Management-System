@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
+import { markPendingVoidRequestsSuperseded } from "@/lib/void-pending";
 
 const DonationSchema = z
   .object({
@@ -98,14 +99,88 @@ export async function createDonationAction(formData: FormData) {
   redirect("/donations");
 }
 
-export async function deleteDonationAction(donationId: string) {
-  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
-  const deleted = await prisma.donation.delete({
+export async function requestVoidDonationAction(donationId: string, formData: FormData) {
+  const session = await requireRole(["STAFF", "TREASURER"] satisfies Role[]);
+  const reason = String(formData.get("voidReason") ?? "").trim();
+  if (reason.length < 3) {
+    throw new Error("A reason is required for the void request.");
+  }
+
+  const existing = await prisma.donation.findUnique({
     where: { id: donationId },
+    select: { id: true, isDeleted: true },
+  });
+  if (!existing || existing.isDeleted) {
+    throw new Error("Donation not found.");
+  }
+
+  const dup = await prisma.voidRequest.findFirst({
+    where: {
+      entity: "DONATION",
+      entityId: donationId,
+      status: "PENDING",
+    },
+    select: { id: true },
+  });
+  if (dup) {
+    throw new Error("A void request for this donation is already awaiting admin review.");
+  }
+
+  await prisma.voidRequest.create({
+    data: {
+      entity: "DONATION",
+      entityId: donationId,
+      requestedById: session.userId,
+      reason: reason.slice(0, 500),
+    },
+  });
+
+  await logAction({
+    action: "VOID_REQUEST",
+    entity: "Donation",
+    entityId: donationId,
+    details: { reason, requestedBy: session.userId },
+  });
+
+  redirect("/donations");
+}
+
+export async function voidDonationAction(donationId: string, formData: FormData) {
+  const session = await requireRole(["ADMIN"] satisfies Role[]);
+  const voidReason = String(formData.get("voidReason") ?? "").trim();
+  if (voidReason.length < 3) {
+    throw new Error("Void reason is required.");
+  }
+
+  const existing = await prisma.donation.findUnique({
+    where: { id: donationId },
+    select: {
+      id: true,
+      memberId: true,
+      amount: true,
+      type: true,
+      date: true,
+      isDeleted: true,
+    },
+  });
+  if (!existing || existing.isDeleted) {
+    throw new Error("Donation not found.");
+  }
+
+  await markPendingVoidRequestsSuperseded("DONATION", donationId, session.userId);
+
+  const deleted = await prisma.donation.update({
+    where: { id: donationId },
+    data: {
+      isDeleted: true,
+      voidReason,
+      voidedAt: new Date(),
+      voidedBy: session.userId,
+    },
     select: { id: true, memberId: true, amount: true, type: true, date: true },
   });
   await logAction({
-    action: "DELETE",
+    action: "VOID",
     entity: "Donation",
     entityId: deleted.id,
     details: {
@@ -113,6 +188,8 @@ export async function deleteDonationAction(donationId: string) {
       amount: Number(deleted.amount),
       type: deleted.type,
       date: deleted.date.toISOString(),
+      voidReason,
+      voidedBy: session.userId,
     },
   });
   redirect("/donations");

@@ -3,7 +3,7 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role, DonationType } from "@/generated/prisma/enums";
-import { deleteDonationAction } from "./actions";
+import { requestVoidDonationAction, voidDonationAction } from "./actions";
 import {
   DeleteSubmitButton,
   GetSubmitButton,
@@ -89,7 +89,7 @@ export default async function DonationsPage(props: {
   const from = parseDateInput(searchParams?.from);
   const to = parseDateInput(searchParams?.to);
 
-  let where: Prisma.DonationWhereInput = {};
+  let where: Prisma.DonationWhereInput = { isDeleted: false };
   if (type) where = { ...where, type };
   if (from || to) {
     where = {
@@ -168,6 +168,24 @@ export default async function DonationsPage(props: {
     );
   } catch {
     dbReady = false;
+  }
+
+  const isAdmin = session.role === "ADMIN";
+  let pendingVoidDonationIds = new Set<string>();
+  if (dbReady && canEdit && donations.length > 0) {
+    try {
+      const pend = await prisma.voidRequest.findMany({
+        where: {
+          entity: "DONATION",
+          status: "PENDING",
+          entityId: { in: donations.map((d) => d.id) },
+        },
+        select: { entityId: true },
+      });
+      pendingVoidDonationIds = new Set(pend.map((p) => p.entityId));
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -333,11 +351,37 @@ export default async function DonationsPage(props: {
                     </td>
                     {canEdit ? (
                       <td className="px-4 py-3">
-                        <form
-                          action={deleteDonationAction.bind(null, d.id)}
-                        >
-                          <DeleteSubmitButton />
-                        </form>
+                        <div className="flex flex-col gap-1">
+                          {pendingVoidDonationIds.has(d.id) ? (
+                            <span className="text-xs font-medium text-amber-800">
+                              Void pending admin approval
+                            </span>
+                          ) : null}
+                          <form
+                            action={
+                              isAdmin
+                                ? voidDonationAction.bind(null, d.id)
+                                : requestVoidDonationAction.bind(null, d.id)
+                            }
+                          >
+                            <input type="hidden" name="voidReason" defaultValue="" />
+                            <DeleteSubmitButton
+                              requireReason
+                              confirmMessage={
+                                isAdmin
+                                  ? "Are you sure you want to void this donation?"
+                                  : "Submit a void request? The donation stays active until an administrator approves."
+                              }
+                              reasonPromptMessage={
+                                isAdmin
+                                  ? "Please provide a reason for voiding this donation:"
+                                  : "Reason for this void request (admin will review):"
+                              }
+                            >
+                              {isAdmin ? "Void" : "Request void"}
+                            </DeleteSubmitButton>
+                          </form>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

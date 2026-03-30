@@ -12,7 +12,7 @@ const ExpenseTypeSchema = z.object({
     .string()
     .trim()
     .min(2, "Type name must be at least 2 characters")
-    .max(50, "Type name is too long"),
+    .max(200, "Type name is too long"),
 });
 
 const ExpenseTypeConfigSchema = z.object({

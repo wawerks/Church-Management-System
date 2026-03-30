@@ -87,7 +87,10 @@ function NavItem(props: {
   label: string;
   icon: IconName;
   isActive: boolean;
+  badgeCount?: number;
 }) {
+  const showBadge =
+    typeof props.badgeCount === "number" && props.badgeCount > 0;
   return (
     <li>
       <Link
@@ -100,7 +103,14 @@ function NavItem(props: {
         }`}
       >
         <NavIcon name={props.icon} />
-        {props.label}
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span className="truncate">{props.label}</span>
+          {showBadge ? (
+            <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {props.badgeCount! > 99 ? "99+" : props.badgeCount}
+            </span>
+          ) : null}
+        </span>
       </Link>
     </li>
   );
@@ -110,11 +120,18 @@ export function Sidebar(props: {
   role: Role;
   userName?: string;
   children?: ReactNode;
+  pendingVoidCount?: number;
 }) {
   const role = props.role;
   const pathname = usePathname();
 
-  const topNav: Array<{ href: string; label: string; icon: IconName; roles?: Role[] }> = [
+  const topNav: Array<{
+    href: string;
+    label: string;
+    icon: IconName;
+    roles?: Role[];
+    badgeCount?: number;
+  }> = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
     { href: "/profile", label: "Profile", icon: "profile" },
     ...(canManageUsers(role)
@@ -137,6 +154,13 @@ export function Sidebar(props: {
             label: "Expense Types",
             icon: "expenses" as const,
             roles: ["ADMIN"] as Role[],
+          },
+          {
+            href: "/void-requests",
+            label: "Void approvals",
+            icon: "logs" as const,
+            roles: ["ADMIN"] as Role[],
+            badgeCount: props.pendingVoidCount,
           },
         ]
       : []),
@@ -198,6 +222,7 @@ export function Sidebar(props: {
                   label={i.label}
                   icon={i.icon}
                   isActive={isActivePath(i.href)}
+                  badgeCount={i.badgeCount}
                 />
               ))}
           </ul>

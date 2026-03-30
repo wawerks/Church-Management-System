@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
 import { DeleteSubmitButton } from "@/components/form-buttons";
-import { deleteExpenseAction } from "./actions";
+import { requestVoidExpenseAction, voidExpenseAction } from "./actions";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ExpensesFilters } from "@/components/ExpensesFilters";
 
@@ -84,11 +84,12 @@ export default async function ExpensesPage(props: {
     const [types, serviceIncomes, allocatedExpenseMonths] = await Promise.all([
       prisma.expenseType.findMany({ orderBy: { name: "asc" } }),
       prisma.serviceIncome.findMany({
+        where: { isDeleted: false },
         select: { serviceDate: true, amount: true },
         orderBy: { serviceDate: "desc" },
       }),
       prisma.expense.findMany({
-        where: { allocationPercentUsed: { not: null } },
+        where: { isDeleted: false, allocationPercentUsed: { not: null } },
         select: { date: true },
         orderBy: { date: "desc" },
       }),
@@ -125,6 +126,7 @@ export default async function ExpensesPage(props: {
   try {
     const [expenseRows, memberRows] = await Promise.all([
       prisma.expense.findMany({
+        where: { isDeleted: false },
         select: { receivedBy: true },
         orderBy: { createdAt: "desc" },
         take: 200,
@@ -189,6 +191,7 @@ export default async function ExpensesPage(props: {
   }
 
   const where: Prisma.ExpenseWhereInput = {
+    isDeleted: false,
     ...(type ? { type } : {}),
     date: budgetDateFilter,
   };
@@ -226,6 +229,7 @@ export default async function ExpensesPage(props: {
 
   try {
     const spentWhere = {
+      isDeleted: false,
       date: {
         gte: budgetMonthStart,
         lt: budgetMonthEnd,
@@ -254,6 +258,7 @@ export default async function ExpensesPage(props: {
       prisma.serviceIncome.aggregate({
         _sum: { amount: true },
         where: {
+          isDeleted: false,
           serviceDate: {
             gte: budgetMonthStart,
             lt: budgetMonthEnd,
@@ -263,6 +268,7 @@ export default async function ExpensesPage(props: {
       prisma.expense.aggregate({
         _sum: { amount: true },
         where: {
+          isDeleted: false,
           date: {
             gte: budgetMonthStart,
             lt: budgetMonthEnd,
@@ -273,6 +279,7 @@ export default async function ExpensesPage(props: {
       prisma.serviceIncome.aggregate({
         _sum: { amount: true },
         where: {
+          isDeleted: false,
           serviceDate: {
             lt: budgetMonthStart,
           },
@@ -281,6 +288,7 @@ export default async function ExpensesPage(props: {
       prisma.expense.aggregate({
         _sum: { amount: true },
         where: {
+          isDeleted: false,
           date: {
             lt: budgetMonthStart,
           },
@@ -292,6 +300,7 @@ export default async function ExpensesPage(props: {
         select: { type: true, amount: true },
       }),
       prisma.expense.findMany({
+        where: { isDeleted: false },
         select: { date: true, amount: true },
         orderBy: { date: "desc" },
       }),
@@ -365,6 +374,23 @@ export default async function ExpensesPage(props: {
   } catch (error) {
     dbReady = false;
     dbErrorMessage = error instanceof Error ? error.message : "Unknown database error";
+  }
+
+  let pendingVoidExpenseIds = new Set<string>();
+  if (dbReady && canEdit && rows.length > 0) {
+    try {
+      const pend = await prisma.voidRequest.findMany({
+        where: {
+          entity: "EXPENSE",
+          status: "PENDING",
+          entityId: { in: rows.map((r) => r.id) },
+        },
+        select: { entityId: true },
+      });
+      pendingVoidExpenseIds = new Set(pend.map((p) => p.entityId));
+    } catch {
+      // ignore
+    }
   }
 
   const totalByType = Object.values(
@@ -642,9 +668,37 @@ export default async function ExpensesPage(props: {
                         </td>
                         {canEdit ? (
                           <td className="px-4 py-3">
-                            <form action={deleteExpenseAction.bind(null, r.id)}>
-                              <DeleteSubmitButton />
-                            </form>
+                            <div className="flex flex-col gap-1">
+                              {pendingVoidExpenseIds.has(r.id) ? (
+                                <span className="text-xs font-medium text-amber-800">
+                                  Void pending admin approval
+                                </span>
+                              ) : null}
+                              <form
+                                action={
+                                  isAdmin
+                                    ? voidExpenseAction.bind(null, r.id)
+                                    : requestVoidExpenseAction.bind(null, r.id)
+                                }
+                              >
+                                <input type="hidden" name="voidReason" defaultValue="" />
+                                <DeleteSubmitButton
+                                  requireReason
+                                  confirmMessage={
+                                    isAdmin
+                                      ? "Are you sure you want to void this expense?"
+                                      : "Submit a void request? The expense stays active until an administrator approves."
+                                  }
+                                  reasonPromptMessage={
+                                    isAdmin
+                                      ? "Please provide a reason for voiding this expense:"
+                                      : "Reason for this void request (admin will review):"
+                                  }
+                                >
+                                  {isAdmin ? "Void" : "Request void"}
+                                </DeleteSubmitButton>
+                              </form>
+                            </div>
                           </td>
                         ) : null}
                       </tr>

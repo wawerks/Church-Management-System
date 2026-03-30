@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   deleteExpenseTypeAction,
   updateExpenseTypesBulkConfigAction,
@@ -36,11 +36,10 @@ function displayFromDigits(digits: string) {
   if (!digits) return "";
   // Treat "0.00" round-trips (internal "0000") as empty so it doesn't block input.
   if (/^0+$/.test(digits)) return "";
-  if (digits.startsWith("100")) {
+  // Literal 100.00%+ uses 5 digits ("10000"); 4-digit "1000" is II.FF => 10.00% — do not mix them.
+  if (digits.startsWith("100") && digits.length >= 5) {
     const decimals = digits.slice(3, 5);
-    if (digits.length === 3) return "100.";
-    if (digits.length === 4) return `100.${decimals}`;
-    return `100.${decimals.slice(0, 2)}`;
+    return `100.${decimals.padEnd(2, "0").slice(0, 2)}`;
   }
 
   if (digits.length === 1) return digits;
@@ -52,7 +51,7 @@ function displayFromDigits(digits: string) {
 function percentFromDigits(digits: string) {
   if (!digits) return 0;
 
-  if (digits.startsWith("100")) {
+  if (digits.startsWith("100") && digits.length >= 5) {
     const decimals = digits.slice(3, 5).padEnd(2, "0");
     return 100 + Number(decimals) / 100;
   }
@@ -79,6 +78,46 @@ function indexForDigitCount(displayValue: string, digitCount: number) {
   return displayValue.length;
 }
 
+type DraftRow = Omit<Row, "allocationPercent"> & {
+  allocationPercentDigits: string;
+};
+
+function allocationPercentToDigits(percent: number): string {
+  if (!Number.isFinite(percent) || percent <= 0) {
+    return "";
+  }
+  if (percent >= 100) {
+    return "10000";
+  }
+
+  const intPart = Math.floor(percent);
+  let frac = Math.round((percent - intPart) * 100);
+  let finalInt = intPart;
+  if (frac >= 100) {
+    finalInt = intPart + 1;
+    frac = 0;
+  }
+  if (finalInt >= 100) {
+    return "10000";
+  }
+
+  const intDigits = String(finalInt).padStart(2, "0");
+  const fracDigits = String(frac).padStart(2, "0");
+  const digits = `${intDigits}${fracDigits}`.slice(0, 4);
+  return /^0+$/.test(digits) ? "" : digits;
+}
+
+function buildDraftFromRows(rows: Row[]): DraftRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
+    allocationPercentDigits: allocationPercentToDigits(
+      Number(r.allocationPercent),
+    ),
+  }));
+}
+
 export function ExpenseTypeAllocationEditor({ rows }: { rows: Row[] }) {
   const [isEditing, setIsEditing] = useState(false);
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
@@ -93,61 +132,31 @@ export function ExpenseTypeAllocationEditor({ rows }: { rows: Row[] }) {
 
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  type DraftRow = Omit<Row, "allocationPercent"> & {
-    allocationPercentDigits: string;
-  };
-
   const [draft, setDraft] = useState<DraftRow[]>(() =>
-    rows.map((r) => {
-      const percent = Number(r.allocationPercent);
-      if (!Number.isFinite(percent) || percent <= 0) {
-        return {
-          id: r.id,
-          name: r.name,
-          isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
-          allocationPercentDigits: "",
-        };
-      }
-
-      if (percent >= 100) {
-        return {
-          id: r.id,
-          name: r.name,
-          isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
-          allocationPercentDigits: "10000",
-        };
-      }
-
-      const intPart = Math.floor(percent);
-      let frac = Math.round((percent - intPart) * 100);
-      let finalInt = intPart;
-      if (frac >= 100) {
-        finalInt = intPart + 1;
-        frac = 0;
-      }
-
-      if (finalInt >= 100) {
-        return {
-          id: r.id,
-          name: r.name,
-          isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
-          allocationPercentDigits: "10000",
-        };
-      }
-
-      const intDigits = String(finalInt).padStart(2, "0");
-      const fracDigits = String(frac).padStart(2, "0");
-      const digits = `${intDigits}${fracDigits}`.slice(0, 4);
-      return {
-        id: r.id,
-        name: r.name,
-        isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
-        // If it round-trips to "0.00", treat it like "empty" so it behaves like a placeholder.
-        allocationPercentDigits: /^0+$/.test(digits) ? "" : digits,
-      };
-
-    }),
+    buildDraftFromRows(rows),
   );
+
+  const rowsSignature = useMemo(
+    () =>
+      JSON.stringify(
+        [...rows]
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .map((r) => ({
+            id: r.id,
+            name: r.name,
+            allocationPercent: r.allocationPercent,
+            isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
+          })),
+      ),
+    [rows],
+  );
+
+  useEffect(() => {
+    if (isEditing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(buildDraftFromRows(rows));
+    // `rows` omitted from deps: encoded by rowsSignature; RSC often passes a new array ref each render.
+  }, [rowsSignature, isEditing]);
 
   const allocatedTotal = useMemo(() => {
     return draft
@@ -189,30 +198,7 @@ export function ExpenseTypeAllocationEditor({ rows }: { rows: Row[] }) {
   }
 
   function resetDraft() {
-    setDraft(
-      rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        isAllocatedFromServiceIncome: r.isAllocatedFromServiceIncome,
-        allocationPercentDigits: (() => {
-          const percent = Number(r.allocationPercent);
-          if (!Number.isFinite(percent) || percent <= 0) return "";
-          if (percent >= 100) return "10000";
-          const intPart = Math.floor(percent);
-          let frac = Math.round((percent - intPart) * 100);
-          let finalInt = intPart;
-          if (frac >= 100) {
-            finalInt = intPart + 1;
-            frac = 0;
-          }
-          if (finalInt >= 100) return "10000";
-          const intDigits = String(finalInt).padStart(2, "0");
-          const fracDigits = String(frac).padStart(2, "0");
-          const digits = `${intDigits}${fracDigits}`.slice(0, 4);
-          return /^0+$/.test(digits) ? "" : digits;
-        })(),
-      })),
-    );
+    setDraft(buildDraftFromRows(rows));
   }
 
   const payload = useMemo(

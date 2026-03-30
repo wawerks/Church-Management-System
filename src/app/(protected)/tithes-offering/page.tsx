@@ -3,7 +3,7 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
-import { deleteServiceIncomeAction } from "./actions";
+import { requestVoidServiceIncomeAction, voidServiceIncomeAction } from "./actions";
 import { DeleteSubmitButton, GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
 import { AddServiceIncomeModal } from "@/components/AddServiceIncomeModal";
 
@@ -17,6 +17,7 @@ export default async function TithesOfferingPage(props: {
   await requireRole(["ADMIN", "PASTOR", "STAFF", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateDonations(session.role);
+  const isAdmin = session.role === "ADMIN";
 
   const searchParams = await props.searchParams;
   const now = new Date();
@@ -83,12 +84,12 @@ export default async function TithesOfferingPage(props: {
 
     const [list, agg] = await Promise.all([
       prisma.serviceIncome.findMany({
-        where: { serviceDate: { gte: rangeStart, lt: rangeEnd } },
+        where: { isDeleted: false, serviceDate: { gte: rangeStart, lt: rangeEnd } },
         orderBy: { serviceDate: "desc" },
         take: 50,
       }),
       prisma.serviceIncome.aggregate({
-        where: { serviceDate: { gte: rangeStart, lt: rangeEnd } },
+        where: { isDeleted: false, serviceDate: { gte: rangeStart, lt: rangeEnd } },
         _sum: { amount: true },
       }),
     ]);
@@ -101,6 +102,23 @@ export default async function TithesOfferingPage(props: {
     total = Number(agg._sum.amount ?? 0);
   } catch {
     dbReady = false;
+  }
+
+  let pendingVoidServiceIncomeIds = new Set<string>();
+  if (dbReady && canEdit && rows.length > 0) {
+    try {
+      const pend = await prisma.voidRequest.findMany({
+        where: {
+          entity: "SERVICE_INCOME",
+          status: "PENDING",
+          entityId: { in: rows.map((r) => r.id) },
+        },
+        select: { entityId: true },
+      });
+      pendingVoidServiceIncomeIds = new Set(pend.map((p) => p.entityId));
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -228,9 +246,37 @@ export default async function TithesOfferingPage(props: {
                     </td>
                     {canEdit ? (
                       <td className="px-4 py-3">
-                        <form action={deleteServiceIncomeAction.bind(null, r.id)}>
-                          <DeleteSubmitButton />
-                        </form>
+                        <div className="flex flex-col gap-1">
+                          {pendingVoidServiceIncomeIds.has(r.id) ? (
+                            <span className="text-xs font-medium text-amber-800">
+                              Void pending admin approval
+                            </span>
+                          ) : null}
+                          <form
+                            action={
+                              isAdmin
+                                ? voidServiceIncomeAction.bind(null, r.id)
+                                : requestVoidServiceIncomeAction.bind(null, r.id)
+                            }
+                          >
+                            <input type="hidden" name="voidReason" defaultValue="" />
+                            <DeleteSubmitButton
+                              requireReason
+                              confirmMessage={
+                                isAdmin
+                                  ? "Are you sure you want to void this service income entry?"
+                                  : "Submit a void request? This entry stays active until an administrator approves."
+                              }
+                              reasonPromptMessage={
+                                isAdmin
+                                  ? "Please provide a reason for voiding this service income:"
+                                  : "Reason for this void request (admin will review):"
+                              }
+                            >
+                              {isAdmin ? "Void" : "Request void"}
+                            </DeleteSubmitButton>
+                          </form>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

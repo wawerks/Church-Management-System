@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus } from "@/generated/prisma/enums";
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
     eventTitle: string;
   }> = [];
   let dbReady = true;
+  let dbError: string | null = null;
 
   try {
     const [memberCount, attendanceToday, monthDonations, donations, attendance] =
@@ -76,6 +78,7 @@ export default async function DashboardPage() {
         prisma.donation.aggregate({
           _sum: { amount: true },
           where: {
+            isDeleted: false,
             date: {
               gte: startOfMonth(today),
               lte: endOfMonth(today),
@@ -83,6 +86,7 @@ export default async function DashboardPage() {
           },
         }),
         prisma.donation.findMany({
+          where: { isDeleted: false },
           take: 5,
           orderBy: { date: "desc" },
           include: { member: true },
@@ -111,8 +115,23 @@ export default async function DashboardPage() {
       memberName: `${a.member.firstName} ${a.member.lastName}`,
       eventTitle: a.event.title,
     }));
-  } catch {
+  } catch (e) {
     dbReady = false;
+    dbError =
+      process.env.NODE_ENV === "development" && e instanceof Error
+        ? e.message
+        : null;
+  }
+
+  let pendingVoidCount = 0;
+  if (dbReady && session.role === "ADMIN") {
+    try {
+      pendingVoidCount = await prisma.voidRequest.count({
+        where: { status: "PENDING" },
+      });
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -128,8 +147,33 @@ export default async function DashboardPage() {
 
       {!dbReady ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Database isn’t ready yet. Set up MySQL + run Prisma migrations to
-          see live stats.
+          <p>
+            Database isn’t ready yet. Ensure MySQL is running,{" "}
+            <code className="rounded bg-amber-100 px-1">DATABASE_URL</code> in{" "}
+            <code className="rounded bg-amber-100 px-1">.env</code> matches your
+            server, then run{" "}
+            <code className="rounded bg-amber-100 px-1">npm run db:migrate</code>{" "}
+            and restart the dev server.
+          </p>
+          {dbError ? (
+            <p className="mt-2 font-mono text-xs text-amber-950/90">{dbError}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {dbReady && session.role === "ADMIN" && pendingVoidCount > 0 ? (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+          <Link
+            href="/void-requests"
+            className="font-semibold text-sky-950 underline decoration-sky-700/40 underline-offset-2 hover:decoration-sky-800"
+          >
+            {pendingVoidCount} void request
+            {pendingVoidCount === 1 ? "" : "s"} awaiting your approval
+          </Link>
+          <span className="text-sky-800/90">
+            {" "}
+            — review reason and approve or decline on the Void approvals page.
+          </span>
         </div>
       ) : null}
 

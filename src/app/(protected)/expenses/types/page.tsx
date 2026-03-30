@@ -30,6 +30,11 @@ export default async function ExpenseTypesPage() {
     dbReady = false;
   }
 
+  const enabledAllocationTotal = rows
+    .filter((r) => r.isAllocatedFromServiceIncome)
+    .reduce((sum, r) => sum + r.allocationPercent, 0);
+  const allocationTotals100 = Math.abs(enabledAllocationTotal - 100) < 0.0001;
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3">
@@ -50,6 +55,27 @@ export default async function ExpenseTypesPage() {
       {!dbReady ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Database isn&apos;t ready yet. Run Prisma migration first.
+        </div>
+      ) : null}
+
+      {dbReady && !allocationTotals100 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-medium text-amber-950">
+            Enabled lines add up to{" "}
+            <span className="tabular-nums">
+              {enabledAllocationTotal.toFixed(2)}%
+            </span>
+            . They need to total exactly 100% so monthly service income is split once,
+            not double-counted.
+          </p>
+          <p className="mt-2 text-amber-900/90">
+            This often happens when legacy categories (for example honorarium or
+            transportation) stay enabled next to overlapping lines from the seeded
+            budget. Uncheck Include in allocation for types you are not using in the
+            current 100% plan, or delete them if they are obsolete. Existing expense
+            records are unchanged; only the allocation math for new periods is
+            affected.
+          </p>
         </div>
       ) : null}
 

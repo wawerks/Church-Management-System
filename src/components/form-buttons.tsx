@@ -68,6 +68,9 @@ type DeleteSubmitButtonProps = Omit<
   pendingLabel?: string;
   children?: React.ReactNode;
   confirmMessage?: string;
+  requireReason?: boolean;
+  reasonPromptMessage?: string;
+  reasonFieldName?: string;
 };
 
 /** Destructive submit (server actions): pill shape, red fill; pending state is spinner only by default. */
@@ -75,6 +78,9 @@ export function DeleteSubmitButton({
   children = "Delete",
   pendingLabel = "",
   confirmMessage = "Are you sure you want to delete this item?",
+  requireReason = false,
+  reasonPromptMessage = "Please provide a reason:",
+  reasonFieldName = "voidReason",
   className = "",
   disabled,
   onClick,
@@ -89,6 +95,20 @@ export function DeleteSubmitButton({
         if (!window.confirm(confirmMessage)) {
           e.preventDefault();
           return;
+        }
+        if (requireReason) {
+          const reason = window.prompt(reasonPromptMessage)?.trim() ?? "";
+          if (!reason) {
+            e.preventDefault();
+            return;
+          }
+          const form = (e.currentTarget as HTMLButtonElement).closest("form");
+          if (form) {
+            const input = form.querySelector(
+              `input[name="${reasonFieldName}"]`,
+            ) as HTMLInputElement | null;
+            if (input) input.value = reason;
+          }
         }
         onClickCapture?.(e);
       }}

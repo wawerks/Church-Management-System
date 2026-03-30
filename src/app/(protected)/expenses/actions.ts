@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
+import { markPendingVoidRequestsSuperseded } from "@/lib/void-pending";
 
 const ExpenseSchema = z.object({
   type: z.string().min(1),
@@ -59,6 +60,7 @@ export async function createExpenseAction(formData: FormData) {
   const serviceIncomeAgg = await prisma.serviceIncome.aggregate({
     _sum: { amount: true },
     where: {
+      isDeleted: false,
       serviceDate: {
         gte: monthStart,
         lt: nextMonthStart,
@@ -77,6 +79,7 @@ export async function createExpenseAction(formData: FormData) {
     const spentAgg = await prisma.expense.aggregate({
       _sum: { amount: true },
       where: {
+        isDeleted: false,
         type,
         date: {
           gte: monthStart,
@@ -143,14 +146,89 @@ export async function createExpenseAction(formData: FormData) {
   redirect(budgetMonth ? `/expenses?budgetMonth=${budgetMonth}` : "/expenses");
 }
 
-export async function deleteExpenseAction(expenseId: string) {
-  await requireRole(["ADMIN", "STAFF", "TREASURER"] satisfies Role[]);
-  const deleted = await prisma.expense.delete({
+export async function requestVoidExpenseAction(expenseId: string, formData: FormData) {
+  const session = await requireRole(["STAFF", "TREASURER"] satisfies Role[]);
+  const reason = String(formData.get("voidReason") ?? "").trim();
+  if (reason.length < 3) {
+    throw new Error("A reason is required for the void request.");
+  }
+
+  const existing = await prisma.expense.findUnique({
     where: { id: expenseId },
+    select: { id: true, isDeleted: true },
+  });
+  if (!existing || existing.isDeleted) {
+    throw new Error("Expense not found.");
+  }
+
+  const dup = await prisma.voidRequest.findFirst({
+    where: {
+      entity: "EXPENSE",
+      entityId: expenseId,
+      status: "PENDING",
+    },
+    select: { id: true },
+  });
+  if (dup) {
+    throw new Error("A void request for this expense is already awaiting admin review.");
+  }
+
+  await prisma.voidRequest.create({
+    data: {
+      entity: "EXPENSE",
+      entityId: expenseId,
+      requestedById: session.userId,
+      reason: reason.slice(0, 500),
+    },
+  });
+
+  await logAction({
+    action: "VOID_REQUEST",
+    entity: "Expense",
+    entityId: expenseId,
+    details: { reason, requestedBy: session.userId },
+  });
+
+  redirect("/expenses");
+}
+
+export async function voidExpenseAction(expenseId: string, formData: FormData) {
+  const session = await requireRole(["ADMIN"] satisfies Role[]);
+  const voidReason = String(formData.get("voidReason") ?? "").trim();
+  if (voidReason.length < 3) {
+    throw new Error("Void reason is required.");
+  }
+
+  const existing = await prisma.expense.findUnique({
+    where: { id: expenseId },
+    select: {
+      id: true,
+      type: true,
+      claimedBy: true,
+      receivedBy: true,
+      amount: true,
+      date: true,
+      isDeleted: true,
+    },
+  });
+  if (!existing || existing.isDeleted) {
+    throw new Error("Expense not found.");
+  }
+
+  await markPendingVoidRequestsSuperseded("EXPENSE", expenseId, session.userId);
+
+  const deleted = await prisma.expense.update({
+    where: { id: expenseId },
+    data: {
+      isDeleted: true,
+      voidReason,
+      voidedAt: new Date(),
+      voidedBy: session.userId,
+    },
     select: { id: true, type: true, claimedBy: true, receivedBy: true, amount: true, date: true },
   });
   await logAction({
-    action: "DELETE",
+    action: "VOID",
     entity: "Expense",
     entityId: deleted.id,
     details: {
@@ -159,6 +237,8 @@ export async function deleteExpenseAction(expenseId: string) {
       receivedBy: deleted.receivedBy,
       amount: Number(deleted.amount),
       date: deleted.date.toISOString(),
+      voidReason,
+      voidedBy: session.userId,
     },
   });
   redirect("/expenses");
