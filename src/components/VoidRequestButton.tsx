@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { InlineSpinner } from "@/components/form-buttons";
 
@@ -16,31 +15,6 @@ type VoidRequestButtonProps = {
   confirmDescription?: string;
   className?: string;
 };
-
-function SubmitVoidRequestButton({
-  onClick,
-}: {
-  onClick: () => void;
-}) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      onClick={onClick}
-      disabled={pending}
-      className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
-    >
-      {pending ? (
-        <span className="inline-flex items-center gap-2">
-          <InlineSpinner className="border-2 border-white/80" />
-          Processing…
-        </span>
-      ) : (
-        "Submit request"
-      )}
-    </button>
-  );
-}
 
 export function VoidRequestButton({
   action,
@@ -68,6 +42,13 @@ export function VoidRequestButton({
     !modalClosing &&
     submitSessionId === openSessionId &&
     serverState.ok === true;
+
+  const isProcessing =
+    modalMounted &&
+    !modalClosing &&
+    submitSessionId === openSessionId &&
+    serverState.ok === null &&
+    !serverState.error;
   const errorToShow =
     modalMounted &&
     !modalClosing &&
@@ -185,9 +166,23 @@ export function VoidRequestButton({
                   >
                     Cancel
                   </button>
-                  <SubmitVoidRequestButton
-                    onClick={() => setSubmitSessionId(openSessionId)}
-                  />
+                  <button
+                    type="submit"
+                    onClick={() => {
+                      setSubmitSessionId(openSessionId);
+                    }}
+                    disabled={isProcessing}
+                    className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {isProcessing ? (
+                      <span className="inline-flex items-center gap-2">
+                        <InlineSpinner className="border-2 border-white/80" />
+                        Processing…
+                      </span>
+                    ) : (
+                      "Submit request"
+                    )}
+                  </button>
                 </div>
               </form>
             )}
