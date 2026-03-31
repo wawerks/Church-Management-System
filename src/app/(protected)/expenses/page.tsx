@@ -4,8 +4,8 @@ import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
-import { DeleteSubmitButton } from "@/components/form-buttons";
-import { requestVoidExpenseAction } from "./actions";
+import { VoidRequestButton } from "@/components/VoidRequestButton";
+import { requestVoidExpenseModalAction } from "./actions";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ExpensesFilters } from "@/components/ExpensesFilters";
 import { ExpenseHighlightScroller } from "@/components/ExpenseHighlightScroller";
@@ -753,23 +753,15 @@ export default async function ExpensesPage(props: {
                                   Pending
                                 </span>
                               ) : (
-                                <form
-                                  action={requestVoidExpenseAction.bind(null, r.id)}
-                                >
-                                  <input type="hidden" name="voidReason" defaultValue="" />
-                                  <DeleteSubmitButton
-                                    className="w-[116px]"
-                                    requireReason
-                                    confirmMessage={
-                                      "Submit a void request? The expense stays active until an administrator approves."
-                                    }
-                                    reasonPromptMessage={
-                                      "Reason for this void request (admin will review):"
-                                    }
-                                  >
-                                    Request void
-                                  </DeleteSubmitButton>
-                                </form>
+                                <VoidRequestButton
+                                  action={requestVoidExpenseModalAction.bind(
+                                    null,
+                                    r.id,
+                                  )}
+                                  className="w-[116px]"
+                                  confirmTitle="Submit void request"
+                                  confirmDescription="The expense stays active until an administrator approves."
+                                />
                               )}
                             </div>
                           </td>

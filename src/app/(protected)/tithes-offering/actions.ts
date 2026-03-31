@@ -100,6 +100,73 @@ export async function requestVoidServiceIncomeAction(id: string, formData: FormD
   redirect("/tithes-offering");
 }
 
+export type VoidRequestModalState = { ok: boolean | null; error: string | null };
+
+/**
+ * Modal-friendly version for `useFormState`.
+ * Returns { ok, error } instead of redirecting.
+ */
+export async function requestVoidServiceIncomeModalAction(
+  id: string,
+  _prevState: VoidRequestModalState,
+  formData: FormData,
+): Promise<VoidRequestModalState> {
+  try {
+    const session = await requireRole(["STAFF", "TREASURER"] satisfies Role[]);
+    const reason = String(formData.get("voidReason") ?? "").trim();
+    if (reason.length < 3) {
+      return { ok: false, error: "A reason is required for the void request." };
+    }
+
+    const existing = await prisma.serviceIncome.findUnique({
+      where: { id },
+      select: { id: true, isDeleted: true },
+    });
+    if (!existing || existing.isDeleted) {
+      return { ok: false, error: "Service income record not found." };
+    }
+
+    const dup = await prisma.voidRequest.findFirst({
+      where: {
+        entity: "SERVICE_INCOME",
+        entityId: id,
+        status: "PENDING",
+      },
+      select: { id: true },
+    });
+    if (dup) {
+      return {
+        ok: false,
+        error:
+          "A void request for this service income entry is already awaiting admin review.",
+      };
+    }
+
+    await prisma.voidRequest.create({
+      data: {
+        entity: "SERVICE_INCOME",
+        entityId: id,
+        requestedById: session.userId,
+        reason: reason.slice(0, 500),
+      },
+    });
+
+    await logAction({
+      action: "VOID_REQUEST",
+      entity: "ServiceIncome",
+      entityId: id,
+      details: { reason, requestedBy: session.userId },
+    });
+
+    return { ok: true, error: null };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Unable to submit void request.",
+    };
+  }
+}
+
 export async function voidServiceIncomeAction(id: string, formData: FormData) {
   const session = await requireRole(["ADMIN"] satisfies Role[]);
   const voidReason = String(formData.get("voidReason") ?? "").trim();

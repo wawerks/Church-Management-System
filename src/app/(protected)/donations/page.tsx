@@ -3,12 +3,13 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role, DonationType } from "@/generated/prisma/enums";
-import { requestVoidDonationAction, voidDonationAction } from "./actions";
+import { requestVoidDonationModalAction, voidDonationAction } from "./actions";
 import {
   DeleteSubmitButton,
   GetSubmitButton,
   PendingGetForm,
 } from "@/components/form-buttons";
+import { VoidRequestButton } from "@/components/VoidRequestButton";
 import type { Prisma } from "@/generated/prisma/client";
 import { AddDonationModal } from "@/components/AddDonationModal";
 
@@ -357,30 +358,27 @@ export default async function DonationsPage(props: {
                               Void pending admin approval
                             </span>
                           ) : null}
-                          <form
-                            action={
-                              isAdmin
-                                ? voidDonationAction.bind(null, d.id)
-                                : requestVoidDonationAction.bind(null, d.id)
-                            }
-                          >
-                            <input type="hidden" name="voidReason" defaultValue="" />
-                            <DeleteSubmitButton
-                              requireReason
-                              confirmMessage={
-                                isAdmin
-                                  ? "Are you sure you want to void this donation?"
-                                  : "Submit a void request? The donation stays active until an administrator approves."
-                              }
-                              reasonPromptMessage={
-                                isAdmin
-                                  ? "Please provide a reason for voiding this donation:"
-                                  : "Reason for this void request (admin will review):"
-                              }
-                            >
-                              {isAdmin ? "Void" : "Request void"}
-                            </DeleteSubmitButton>
-                          </form>
+                          {isAdmin ? (
+                            <form action={voidDonationAction.bind(null, d.id)}>
+                              <input type="hidden" name="voidReason" defaultValue="" />
+                              <DeleteSubmitButton
+                                requireReason
+                                confirmMessage="Are you sure you want to void this donation?"
+                                reasonPromptMessage="Please provide a reason for voiding this donation:"
+                              >
+                                Void
+                              </DeleteSubmitButton>
+                            </form>
+                          ) : (
+                            <VoidRequestButton
+                              action={requestVoidDonationModalAction.bind(
+                                null,
+                                d.id,
+                              )}
+                              confirmTitle="Submit void request"
+                              confirmDescription="The donation stays active until an administrator approves."
+                            />
+                          )}
                         </div>
                       </td>
                     ) : null}

@@ -3,8 +3,12 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { canMutateDonations } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
-import { requestVoidServiceIncomeAction, voidServiceIncomeAction } from "./actions";
+import {
+  requestVoidServiceIncomeModalAction,
+  voidServiceIncomeAction,
+} from "./actions";
 import { DeleteSubmitButton, GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
+import { VoidRequestButton } from "@/components/VoidRequestButton";
 import { AddServiceIncomeModal } from "@/components/AddServiceIncomeModal";
 
 function pad2(n: number) {
@@ -252,30 +256,27 @@ export default async function TithesOfferingPage(props: {
                               Void pending admin approval
                             </span>
                           ) : null}
-                          <form
-                            action={
-                              isAdmin
-                                ? voidServiceIncomeAction.bind(null, r.id)
-                                : requestVoidServiceIncomeAction.bind(null, r.id)
-                            }
-                          >
-                            <input type="hidden" name="voidReason" defaultValue="" />
-                            <DeleteSubmitButton
-                              requireReason
-                              confirmMessage={
-                                isAdmin
-                                  ? "Are you sure you want to void this service income entry?"
-                                  : "Submit a void request? This entry stays active until an administrator approves."
-                              }
-                              reasonPromptMessage={
-                                isAdmin
-                                  ? "Please provide a reason for voiding this service income:"
-                                  : "Reason for this void request (admin will review):"
-                              }
-                            >
-                              {isAdmin ? "Void" : "Request void"}
-                            </DeleteSubmitButton>
-                          </form>
+                          {isAdmin ? (
+                            <form action={voidServiceIncomeAction.bind(null, r.id)}>
+                              <input type="hidden" name="voidReason" defaultValue="" />
+                              <DeleteSubmitButton
+                                requireReason
+                                confirmMessage="Are you sure you want to void this service income entry?"
+                                reasonPromptMessage="Please provide a reason for voiding this service income:"
+                              >
+                                Void
+                              </DeleteSubmitButton>
+                            </form>
+                          ) : (
+                            <VoidRequestButton
+                              action={requestVoidServiceIncomeModalAction.bind(
+                                null,
+                                r.id,
+                              )}
+                              confirmTitle="Submit void request"
+                              confirmDescription="This entry stays active until an administrator approves."
+                            />
+                          )}
                         </div>
                       </td>
                     ) : null}
