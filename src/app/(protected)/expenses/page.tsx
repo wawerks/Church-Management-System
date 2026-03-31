@@ -171,7 +171,7 @@ export default async function ExpensesPage(props: {
     ? "expenses"
     : typeof viewRaw === "string" && ["summary", "balance", "expenses"].includes(viewRaw)
       ? viewRaw
-      : "summary";
+      : "balance";
 
   const from = parseDateInput(searchParams?.from);
   const to = parseDateInput(searchParams?.to);
