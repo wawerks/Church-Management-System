@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { LogoutButton } from "@/components/LogoutButton";
 import type { Role } from "@/generated/prisma/enums";
-import { canManageUsers } from "@/lib/permissions";
+import { canManageUsers, canRequestFinancialVoid } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 function MobileNav(props: { role: Role; pendingVoidCount: number }) {
@@ -38,6 +38,9 @@ function MobileNav(props: { role: Role; pendingVoidCount: number }) {
             badge: props.pendingVoidCount,
           },
         ]
+      : []),
+    ...(canRequestFinancialVoid(role)
+      ? [{ href: "/void-request", label: "Void request", roles: ["STAFF", "TREASURER"] as Role[] }]
       : []),
     { href: "/events", label: "Events", roles: ["ADMIN", "PASTOR", "TREASURER"] },
     {

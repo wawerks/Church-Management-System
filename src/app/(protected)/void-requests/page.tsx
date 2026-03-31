@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
 import { approveVoidRequestAction, declineVoidRequestAction } from "./actions";
 import { SubmitButton } from "@/components/form-buttons";
@@ -11,6 +12,12 @@ function formatMoney(value: number) {
     maximumFractionDigits: 2,
   });
 }
+
+function toMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+type VoidRowDetailParts = { before: string; amount: string; after: string };
 
 function entityLabel(entity: string) {
   switch (entity) {
@@ -38,12 +45,23 @@ function entityChipClasses(entity: string) {
   }
 }
 
+type PendingVoidRequest = Prisma.VoidRequestGetPayload<{
+  include: { requestedBy: { select: { name: true; email: true } } };
+}>;
+
+type RecentVoidRequest = Prisma.VoidRequestGetPayload<{
+  include: {
+    requestedBy: { select: { name: true } };
+    reviewedBy: { select: { name: true } };
+  };
+}>;
+
 export default async function VoidRequestsPage() {
   await requireRole(["ADMIN"] satisfies Role[]);
 
   let dbReady = true;
   let dbError: string | null = null;
-  let pending: Array<any> = [];
+  let pending: PendingVoidRequest[] = [];
   try {
     pending = await prisma.voidRequest.findMany({
       where: { status: "PENDING" },
@@ -71,15 +89,20 @@ export default async function VoidRequestsPage() {
           return {
             req,
             summary: "Record missing or already voided",
-            detail: null as string | null,
+            detailParts: null as VoidRowDetailParts | null,
             href: "/donations",
           };
         }
         const name = `${d.member.firstName} ${d.member.lastName}`.trim();
+        const amountStr = formatMoney(Number(d.amount));
         return {
           req,
           summary: `Donation — ${name}`,
-          detail: `${d.type} • ${formatMoney(Number(d.amount))} • ${d.date.toLocaleDateString()}`,
+          detailParts: {
+            before: `${d.type} • `,
+            amount: amountStr,
+            after: ` • ${d.date.toLocaleDateString()}`,
+          },
           href: "/donations",
         };
       }
@@ -91,14 +114,19 @@ export default async function VoidRequestsPage() {
           return {
             req,
             summary: "Record missing or already voided",
-            detail: null,
+            detailParts: null,
             href: "/tithes-offering",
           };
         }
+        const amountStr = formatMoney(Number(s.amount));
         return {
           req,
           summary: "Service income",
-          detail: `${formatMoney(Number(s.amount))} • ${s.serviceDate.toLocaleDateString()}`,
+          detailParts: {
+            before: "",
+            amount: amountStr,
+            after: ` • ${s.serviceDate.toLocaleDateString()}`,
+          },
           href: "/tithes-offering",
         };
       }
@@ -109,20 +137,28 @@ export default async function VoidRequestsPage() {
         return {
           req,
           summary: "Record missing or already voided",
-          detail: null,
+          detailParts: null,
           href: "/expenses",
         };
       }
+      const amountStr = formatMoney(Number(e.amount));
+      const expenseHref = `/expenses?view=expenses&budgetMonth=${encodeURIComponent(
+        toMonthKey(e.date),
+      )}&highlight=${encodeURIComponent(e.id)}`;
       return {
         req,
         summary: `Expense — ${e.type}`,
-        detail: `${formatMoney(Number(e.amount))} • ${e.date.toLocaleDateString()} • ${e.receivedBy}`,
-        href: "/expenses",
+        detailParts: {
+          before: "",
+          amount: amountStr,
+          after: ` • ${e.date.toLocaleDateString()} • ${e.receivedBy}`,
+        },
+        href: expenseHref,
       };
     }),
   );
 
-  let recent: Array<any> = [];
+  let recent: RecentVoidRequest[] = [];
   if (dbReady) {
     try {
       recent = await prisma.voidRequest.findMany({
@@ -200,8 +236,11 @@ export default async function VoidRequestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {rows.map(({ req, summary, detail, href }) => (
-                  <tr key={req.id} className="align-top">
+                {rows.map(({ req, summary, detailParts, href }, idx) => (
+                  <tr
+                    key={req.id}
+                    className={`align-top ${idx % 2 === 0 ? "bg-white" : "bg-amber-50/50"}`}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -220,8 +259,14 @@ export default async function VoidRequestsPage() {
                         <div className="font-semibold text-slate-900">
                           {summary}
                         </div>
-                        {detail ? (
-                          <div className="text-sm text-slate-600">{detail}</div>
+                        {detailParts ? (
+                          <div className="text-sm text-slate-600">
+                            {detailParts.before}
+                            <span className="mx-0.5 inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 font-bold tabular-nums text-amber-950 ring-1 ring-amber-300/80">
+                              {detailParts.amount}
+                            </span>
+                            {detailParts.after}
+                          </div>
                         ) : null}
                       </div>
 

@@ -12,12 +12,14 @@ export function ExpensesFilters({
   view,
   budgetMonth,
   monthOptions,
+  highlight,
 }: {
   expenseTypes: ExpenseTypeOption[];
   type?: string;
   view?: string;
   budgetMonth: string;
   monthOptions: string[];
+  highlight?: string;
 }) {
   const router = useRouter();
 
@@ -34,9 +36,10 @@ export function ExpensesFilters({
     if (draftType) params.set("type", draftType);
     if (view) params.set("view", view);
     if (draftBudgetMonth) params.set("budgetMonth", draftBudgetMonth);
+    if (highlight) params.set("highlight", highlight);
     const s = params.toString();
     return s;
-  }, [draftType, draftBudgetMonth, view]);
+  }, [draftType, draftBudgetMonth, view, highlight]);
 
   function pushNow(next?: {
     type?: string;

@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus } from "@/generated/prisma/enums";
 import { canViewDashboardDonations } from "@/lib/permissions";
+import type { Prisma } from "@/generated/prisma/client";
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -35,6 +36,19 @@ function formatMoney(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function entityLabel(entity: string) {
+  switch (entity) {
+    case "DONATION":
+      return "Donation";
+    case "SERVICE_INCOME":
+      return "Service income";
+    case "EXPENSE":
+      return "Expense";
+    default:
+      return entity;
+  }
 }
 
 export default async function DashboardPage() {
@@ -134,6 +148,35 @@ export default async function DashboardPage() {
     }
   }
 
+  type LatestVoidDecision = Prisma.VoidRequestGetPayload<{
+    include: {
+      reviewedBy: { select: { name: true } };
+    };
+  }>;
+
+  let latestVoidDecision: LatestVoidDecision | null = null;
+  if (dbReady && (session.role === "STAFF" || session.role === "TREASURER")) {
+    try {
+      latestVoidDecision = await prisma.voidRequest.findFirst({
+        where: {
+          requestedById: session.userId,
+          status: { not: "PENDING" },
+        },
+        orderBy: { reviewedAt: "desc" },
+        include: {
+          reviewedBy: { select: { name: true } },
+        },
+      });
+    } catch {
+      latestVoidDecision = null;
+    }
+  }
+
+  const latestVoidDecisionWithinWindow =
+    latestVoidDecision?.reviewedAt &&
+    latestVoidDecision.reviewedAt.getTime() >=
+      new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -174,6 +217,45 @@ export default async function DashboardPage() {
             {" "}
             — review reason and approve or decline on the Void approvals page.
           </span>
+        </div>
+      ) : null}
+
+      {dbReady &&
+      (session.role === "STAFF" || session.role === "TREASURER") &&
+      latestVoidDecision &&
+      latestVoidDecisionWithinWindow ? (
+        <div
+          className={`rounded-lg border p-4 text-sm ${
+            latestVoidDecision.status === "APPROVED"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-rose-200 bg-rose-50 text-rose-900"
+          }`}
+        >
+          <Link
+            href="/void-request"
+            className="font-semibold underline decoration-black/10 underline-offset-2 hover:decoration-black/20"
+          >
+            Void request {latestVoidDecision.status === "APPROVED" ? "approved" : "declined"}
+          </Link>
+          <div className="mt-1">
+            {latestVoidDecision.status === "APPROVED" ? (
+              <>
+                {entityLabel(latestVoidDecision.entity)} reviewed by{" "}
+                {latestVoidDecision.reviewedBy?.name ?? "admin"}{" "}
+                {latestVoidDecision.reviewedAt
+                  ? `on ${latestVoidDecision.reviewedAt.toLocaleDateString()}`
+                  : ""}
+                .
+              </>
+            ) : (
+              <>
+                {entityLabel(latestVoidDecision.entity)} declined
+                {latestVoidDecision.declineNote?.trim()
+                  ? `: ${latestVoidDecision.declineNote}`
+                  : "."}
+              </>
+            )}
+          </div>
         </div>
       ) : null}
 

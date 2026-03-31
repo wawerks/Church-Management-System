@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
 import { DeleteSubmitButton } from "@/components/form-buttons";
-import { requestVoidExpenseAction, voidExpenseAction } from "./actions";
+import { requestVoidExpenseAction } from "./actions";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ExpensesFilters } from "@/components/ExpensesFilters";
+import { ExpenseHighlightScroller } from "@/components/ExpenseHighlightScroller";
 
 export const dynamic = "force-dynamic";
 
@@ -160,15 +161,32 @@ export default async function ExpensesPage(props: {
       ? typeRaw
       : undefined;
 
+  const highlightExpenseId =
+    typeof searchParams?.highlight === "string" && searchParams.highlight.trim().length > 0
+      ? searchParams.highlight.trim()
+      : undefined;
+
   const viewRaw = searchParams?.view;
-  const view =
-    typeof viewRaw === "string" && ["summary", "balance", "expenses"].includes(viewRaw)
+  const view = highlightExpenseId
+    ? "expenses"
+    : typeof viewRaw === "string" && ["summary", "balance", "expenses"].includes(viewRaw)
       ? viewRaw
       : "summary";
 
   const from = parseDateInput(searchParams?.from);
   const to = parseDateInput(searchParams?.to);
-  const budgetMonth = parseMonthKey(searchParams?.budgetMonth) ?? currentMonthKey;
+  let budgetMonth = parseMonthKey(searchParams?.budgetMonth) ?? currentMonthKey;
+  if (highlightExpenseId) {
+    try {
+      const hi = await prisma.expense.findFirst({
+        where: { id: highlightExpenseId, isDeleted: false },
+        select: { date: true },
+      });
+      if (hi) budgetMonth = toMonthKey(hi.date);
+    } catch {
+      // ignore
+    }
+  }
   const { start: budgetMonthStart, end: budgetMonthEnd } = monthRange(budgetMonth);
 
   // Always constrain the table + totals to the selected budget month.
@@ -236,6 +254,8 @@ export default async function ExpensesPage(props: {
       },
     };
 
+    const expenseListTake = highlightExpenseId ? 1000 : 100;
+
     const [
       list,
       agg,
@@ -249,7 +269,7 @@ export default async function ExpensesPage(props: {
       prisma.expense.findMany({
         where,
         orderBy: { date: "desc" },
-        take: 100,
+        take: expenseListTake,
       }),
       prisma.expense.aggregate({
         _sum: { amount: true },
@@ -444,6 +464,7 @@ export default async function ExpensesPage(props: {
             if (key !== "summary" && type) params.set("type", type);
             if (key !== "summary") params.set("budgetMonth", budgetMonth);
             params.set("view", key);
+            if (highlightExpenseId) params.set("highlight", highlightExpenseId);
             return (
               <Link
                 key={key}
@@ -469,6 +490,7 @@ export default async function ExpensesPage(props: {
           budgetMonth={budgetMonth}
           monthOptions={monthOptions}
           view={view}
+          highlight={highlightExpenseId}
         />
       ) : null}
 
@@ -495,7 +517,7 @@ export default async function ExpensesPage(props: {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto px-3">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-slate-700">
@@ -640,7 +662,7 @@ export default async function ExpensesPage(props: {
                     <th className="px-4 py-3 font-medium">Received By</th>
                     <th className="px-4 py-3 font-medium">Date</th>
                     <th className="px-4 py-3 font-medium">Amount</th>
-                    {canEdit ? (
+                    {canEdit && !isAdmin ? (
                       <th className="px-4 py-3 font-medium">Actions</th>
                     ) : null}
                   </tr>
@@ -649,66 +671,154 @@ export default async function ExpensesPage(props: {
                   {rows.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={canEdit ? 5 : 4}
+                        colSpan={canEdit && !isAdmin ? 5 : 4}
                         className="px-4 py-6 text-center text-slate-500"
                       >
                         No expense transactions found.
                       </td>
                     </tr>
                   ) : (
-                    rows.map((r) => (
-                      <tr key={r.id} className="border-t border-slate-100">
-                        <td className="px-4 py-3">{r.type}</td>
-                        <td className="px-4 py-3">{r.receivedBy}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {r.date.toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3 font-semibold">
-                          {formatMoney(Number(r.amount))}
-                        </td>
-                        {canEdit ? (
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1">
-                              {pendingVoidExpenseIds.has(r.id) ? (
-                                <span className="text-xs font-medium text-amber-800">
-                                  Void pending admin approval
-                                </span>
-                              ) : null}
-                              <form
-                                action={
-                                  isAdmin
-                                    ? voidExpenseAction.bind(null, r.id)
-                                    : requestVoidExpenseAction.bind(null, r.id)
-                                }
-                              >
-                                <input type="hidden" name="voidReason" defaultValue="" />
-                                <DeleteSubmitButton
-                                  requireReason
-                                  confirmMessage={
-                                    isAdmin
-                                      ? "Are you sure you want to void this expense?"
-                                      : "Submit a void request? The expense stays active until an administrator approves."
-                                  }
-                                  reasonPromptMessage={
-                                    isAdmin
-                                      ? "Please provide a reason for voiding this expense:"
-                                      : "Reason for this void request (admin will review):"
-                                  }
-                                >
-                                  {isAdmin ? "Void" : "Request void"}
-                                </DeleteSubmitButton>
-                              </form>
+                    rows.map((r) => {
+                      const isHighlighted = highlightExpenseId === r.id;
+                      const hasActions = canEdit && !isAdmin;
+                      const wrapperBase = "bg-emerald-50 border-y border-emerald-300";
+                      const trClass = isHighlighted
+                        ? "border-t-0"
+                        : "border-t border-slate-100";
+                      return (
+                      <tr
+                        key={r.id}
+                        id={`expense-row-${r.id}`}
+                        className={trClass}
+                      >
+                        <td
+                          className={isHighlighted ? "p-0" : "px-4 py-3"}
+                        >
+                          {isHighlighted ? (
+                            <div
+                              className={`${wrapperBase} border-l rounded-l-xl ml-3 px-4 py-3`}
+                            >
+                              {r.type}
                             </div>
+                          ) : (
+                            r.type
+                          )}
+                        </td>
+                        <td className={isHighlighted ? "p-0" : "px-4 py-3"}>
+                          {isHighlighted ? (
+                            <div className={`${wrapperBase} px-4 py-3`}>
+                              {r.receivedBy}
+                            </div>
+                          ) : (
+                            r.receivedBy
+                          )}
+                        </td>
+                        <td
+                          className={
+                            isHighlighted ? "p-0" : "px-4 py-3 text-slate-600"
+                          }
+                        >
+                          {isHighlighted ? (
+                            <div
+                              className={`${wrapperBase} px-4 py-3 text-slate-600`}
+                            >
+                              {r.date.toLocaleDateString()}
+                            </div>
+                          ) : (
+                            r.date.toLocaleDateString()
+                          )}
+                        </td>
+                        <td
+                          className={isHighlighted ? "p-0 font-semibold" : "px-4 py-3 font-semibold"}
+                        >
+                          {isHighlighted ? (
+                            <div
+                              className={`${wrapperBase} px-4 py-3 ${
+                                !hasActions
+                                  ? "border-r rounded-r-xl mr-3"
+                                  : ""
+                              }`}
+                            >
+                              {formatMoney(Number(r.amount))}
+                            </div>
+                          ) : (
+                            formatMoney(Number(r.amount))
+                          )}
+                        </td>
+                        {hasActions ? (
+                          <td
+                            className={isHighlighted ? "p-0" : "px-4 py-3"}
+                          >
+                            {isHighlighted ? (
+                              <div
+                                className={`${wrapperBase} border-r rounded-r-xl mr-3 px-4 py-3`}
+                              >
+                                <div className="flex flex-col gap-1">
+                                  {pendingVoidExpenseIds.has(r.id) ? (
+                                    <span className="text-xs font-medium text-amber-800">
+                                      Void pending admin approval
+                                    </span>
+                                  ) : null}
+                                  <form
+                                    action={requestVoidExpenseAction.bind(
+                                      null,
+                                      r.id,
+                                    )}
+                                  >
+                                    <input type="hidden" name="voidReason" defaultValue="" />
+                                    <DeleteSubmitButton
+                                      requireReason
+                                      confirmMessage={
+                                        "Submit a void request? The expense stays active until an administrator approves."
+                                      }
+                                      reasonPromptMessage={
+                                        "Reason for this void request (admin will review):"
+                                      }
+                                    >
+                                      Request void
+                                    </DeleteSubmitButton>
+                                  </form>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {pendingVoidExpenseIds.has(r.id) ? (
+                                  <span className="text-xs font-medium text-amber-800">
+                                    Void pending admin approval
+                                  </span>
+                                ) : null}
+                                <form
+                                  action={requestVoidExpenseAction.bind(null, r.id)}
+                                >
+                                  <input type="hidden" name="voidReason" defaultValue="" />
+                                  <DeleteSubmitButton
+                                    requireReason
+                                    confirmMessage={
+                                      "Submit a void request? The expense stays active until an administrator approves."
+                                    }
+                                    reasonPromptMessage={
+                                      "Reason for this void request (admin will review):"
+                                    }
+                                  >
+                                    Request void
+                                  </DeleteSubmitButton>
+                                </form>
+                              </div>
+                            )}
                           </td>
                         ) : null}
                       </tr>
-                    ))
+                    );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
           </div>
+          {highlightExpenseId ? (
+            <ExpenseHighlightScroller expenseId={highlightExpenseId} />
+          ) : null}
         </div>
       ) : null}
     </div>

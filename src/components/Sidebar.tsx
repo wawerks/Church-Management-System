@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { LogoutButton } from "@/components/LogoutButton";
-import { canManageUsers } from "@/lib/permissions";
+import { canManageUsers, canRequestFinancialVoid } from "@/lib/permissions";
 
 type IconName =
   | "dashboard"
@@ -161,6 +161,16 @@ export function Sidebar(props: {
             icon: "logs" as const,
             roles: ["ADMIN"] as Role[],
             badgeCount: props.pendingVoidCount,
+          },
+        ]
+      : []),
+    ...(canRequestFinancialVoid(role)
+      ? [
+          {
+            href: "/void-request",
+            label: "Void request",
+            icon: "logs" as const,
+            roles: ["STAFF", "TREASURER"] as Role[],
           },
         ]
       : []),
