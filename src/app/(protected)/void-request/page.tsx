@@ -101,40 +101,6 @@ export default async function VoidRequestPage() {
         </p>
       </header>
 
-      {latestDecision && withinWindow ? (
-        <section
-          className={`rounded-lg border p-4 text-sm ${
-            latestDecision.status === "APPROVED"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border-rose-200 bg-rose-50 text-rose-900"
-          }`}
-        >
-          <div className="font-semibold">
-            {latestDecision.status === "APPROVED"
-              ? "Your void request was approved."
-              : "Your void request was declined."}
-          </div>
-          <div className="mt-1">
-            {entityLabel(latestDecision.entity)}{" "}
-            {latestDecision.status === "APPROVED" ? (
-              <>
-                reviewed by {latestDecision.reviewedBy?.name ?? "admin"}
-                {latestDecision.reviewedAt
-                  ? ` on ${latestDecision.reviewedAt.toLocaleDateString()}`
-                  : ""}
-                .
-              </>
-            ) : (
-              <>
-                {latestDecision.declineNote?.trim()
-                  ? `Declined: ${latestDecision.declineNote}`
-                  : "No decline note provided."}
-              </>
-            )}
-          </div>
-        </section>
-      ) : null}
-
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         {requests.length === 0 ? (
           <div className="rounded-md border border-slate-200 bg-slate-50 p-5 text-center">
@@ -169,7 +135,7 @@ export default async function VoidRequestPage() {
                             {entityLabel(req.entity)}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs font-bold text-slate-600">
                           Requested: {req.createdAt.toLocaleString()}
                         </div>
                         <div>
@@ -187,14 +153,14 @@ export default async function VoidRequestPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusPillClasses(
+                        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${statusPillClasses(
                           req.status,
                         )}`}
                       >
                         {req.status}
                       </span>
                       {req.reviewedAt ? (
-                        <div className="mt-2 text-xs text-slate-500">
+                        <div className="mt-2 text-xs font-bold text-slate-600">
                           Reviewed: {req.reviewedAt.toLocaleString()}
                         </div>
                       ) : null}
