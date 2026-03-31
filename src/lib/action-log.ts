@@ -1,28 +1,53 @@
 import { getServerSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Role } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 
 type LogActionParams = {
-  action: string;
-  entity: string;
+  action?: string;
+  entity?: string;
+  actionType?: string;
+  module?: string;
   entityId?: string;
+  oldValue?: Prisma.InputJsonValue;
+  newValue?: Prisma.InputJsonValue;
   details?: Record<string, unknown>;
+  actor?: {
+    userId: string;
+    name: string;
+    role: Role;
+  };
 };
 
 export async function logAction(params: LogActionParams) {
   const session = await getServerSession();
-  if (!session) return;
+  const actor = params.actor ?? session;
+  if (!actor) return;
+
+  const actionType = params.actionType ?? params.action ?? "UNKNOWN";
+  const moduleName = params.module ?? params.entity ?? "General";
+  const oldValue = params.oldValue ?? null;
+  const newValue =
+    params.newValue ??
+    (params.details
+      ? (params.details as unknown as Prisma.InputJsonValue)
+      : null);
 
   await prisma.actionLog.create({
     data: {
-      actorId: session.userId,
-      actorName: session.name || session.email,
-      actorRole: session.role,
-      action: params.action,
-      entity: params.entity,
+      userId: actor.userId,
+      actionType,
+      module: moduleName,
+      oldValue,
+      newValue,
+      timestamp: new Date(),
+      actorId: actor.userId,
+      actorName: actor.name,
+      actorRole: actor.role,
+      action: actionType,
+      entity: moduleName,
       entityId: params.entityId,
-      // Prisma JSON fields are structurally typed; params.details is intentionally permissive.
-      // Cast keeps this runtime behavior unchanged while satisfying TS.
-      details: params.details as any,
+      details: newValue,
     },
   });
 }

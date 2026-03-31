@@ -734,9 +734,7 @@ export default async function ExpensesPage(props: {
                           {isHighlighted ? (
                             <div
                               className={`${wrapperBase} px-4 py-3 ${
-                                !hasActions
-                                  ? "border-r rounded-r-xl mr-3"
-                                  : ""
+                                "border-r rounded-r-xl mr-3"
                               }`}
                             >
                               {formatMoney(Number(r.amount))}
@@ -747,51 +745,20 @@ export default async function ExpensesPage(props: {
                         </td>
                         {hasActions ? (
                           <td
-                            className={isHighlighted ? "p-0" : "px-4 py-3"}
+                            className="px-4 py-3"
                           >
-                            {isHighlighted ? (
-                              <div
-                                className={`${wrapperBase} border-r rounded-r-xl mr-3 px-4 py-3`}
-                              >
-                                <div className="flex flex-col gap-1">
-                                  {pendingVoidExpenseIds.has(r.id) ? (
-                                    <span className="text-xs font-medium text-amber-800">
-                                      Void pending admin approval
-                                    </span>
-                                  ) : null}
-                                  <form
-                                    action={requestVoidExpenseAction.bind(
-                                      null,
-                                      r.id,
-                                    )}
-                                  >
-                                    <input type="hidden" name="voidReason" defaultValue="" />
-                                    <DeleteSubmitButton
-                                      requireReason
-                                      confirmMessage={
-                                        "Submit a void request? The expense stays active until an administrator approves."
-                                      }
-                                      reasonPromptMessage={
-                                        "Reason for this void request (admin will review):"
-                                      }
-                                    >
-                                      Request void
-                                    </DeleteSubmitButton>
-                                  </form>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col gap-1">
-                                {pendingVoidExpenseIds.has(r.id) ? (
-                                  <span className="text-xs font-medium text-amber-800">
-                                    Void pending admin approval
-                                  </span>
-                                ) : null}
+                            <div className="flex flex-col gap-1">
+                              {pendingVoidExpenseIds.has(r.id) ? (
+                                <span className="inline-flex w-[116px] items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm">
+                                  Pending
+                                </span>
+                              ) : (
                                 <form
                                   action={requestVoidExpenseAction.bind(null, r.id)}
                                 >
                                   <input type="hidden" name="voidReason" defaultValue="" />
                                   <DeleteSubmitButton
+                                    className="w-[116px]"
                                     requireReason
                                     confirmMessage={
                                       "Submit a void request? The expense stays active until an administrator approves."
@@ -803,8 +770,8 @@ export default async function ExpensesPage(props: {
                                     Request void
                                   </DeleteSubmitButton>
                                 </form>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                         ) : null}
                       </tr>

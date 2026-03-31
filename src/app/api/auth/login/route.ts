@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signInAndCreateCookie } from "@/lib/auth";
+import { logAction } from "@/lib/action-log";
 
 const BodySchema = z.object({
   email: z.string().email(),
@@ -46,6 +47,19 @@ export async function POST(req: Request) {
     role: user.role,
     name: user.name,
     email: user.email,
+  });
+
+  await logAction({
+    actionType: "LOGIN",
+    module: "Auth",
+    actor: {
+      userId: user.id,
+      name: user.name || user.email,
+      role: user.role,
+    },
+    newValue: {
+      email: user.email,
+    },
   });
 
   return NextResponse.json({ ok: true });

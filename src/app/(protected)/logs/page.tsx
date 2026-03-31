@@ -22,8 +22,13 @@ export default async function LogsPage() {
     actorRole: Role;
     action: string;
     entity: string;
+    actionType: string | null;
+    module: string | null;
+    oldValue: unknown;
+    newValue: unknown;
     entityId: string | null;
     details: unknown;
+    timestamp: Date;
     createdAt: Date;
   }> = [];
   let dbReady = true;
@@ -38,8 +43,13 @@ export default async function LogsPage() {
         actorRole: true,
         action: true,
         entity: true,
+        actionType: true,
+        module: true,
+        oldValue: true,
+        newValue: true,
         entityId: true,
         details: true,
+        timestamp: true,
         createdAt: true,
       },
     });
@@ -68,15 +78,16 @@ export default async function LogsPage() {
                 <th className="px-4 py-3 font-medium">When</th>
                 <th className="px-4 py-3 font-medium">Actor</th>
                 <th className="px-4 py-3 font-medium">Action</th>
-                <th className="px-4 py-3 font-medium">Entity</th>
-                <th className="px-4 py-3 font-medium">Details</th>
+                <th className="px-4 py-3 font-medium">Module</th>
+                <th className="px-4 py-3 font-medium">Old Value</th>
+                <th className="px-4 py-3 font-medium">New Value</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                     No logs yet.
                   </td>
                 </tr>
@@ -84,24 +95,29 @@ export default async function LogsPage() {
                 logs.map((log) => (
                   <tr key={log.id} className="border-t border-slate-100 align-top">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                      {log.createdAt.toLocaleString()}
+                      {(log.timestamp ?? log.createdAt).toLocaleString()}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="font-medium">{log.actorName}</div>
                       <div className="text-xs text-slate-500">{log.actorRole}</div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
-                      {log.action}
+                      {log.actionType ?? log.action}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
-                      {log.entity}
+                      {log.module ?? log.entity}
                       {log.entityId ? (
                         <div className="break-all text-xs text-slate-500">{log.entityId}</div>
                       ) : null}
                     </td>
                     <td className="max-w-xl px-4 py-3 text-xs text-slate-600">
                       <pre className="whitespace-pre-wrap break-all font-mono">
-                        {formatDetails(log.details)}
+                        {formatDetails(log.oldValue)}
+                      </pre>
+                    </td>
+                    <td className="max-w-xl px-4 py-3 text-xs text-slate-600">
+                      <pre className="whitespace-pre-wrap break-all font-mono">
+                        {formatDetails(log.newValue ?? log.details)}
                       </pre>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">

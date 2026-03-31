@@ -16,14 +16,14 @@ function entityLabel(entity: VoidRequestEntity) {
   }
 }
 
-function entityHref(entity: VoidRequestEntity) {
+function entityHref(entity: VoidRequestEntity, entityId: string) {
   switch (entity) {
     case "DONATION":
       return "/donations";
     case "SERVICE_INCOME":
       return "/tithes-offering";
     case "EXPENSE":
-      return "/expenses";
+      return `/expenses?view=expenses&highlight=${encodeURIComponent(entityId)}`;
     default:
       return "/";
   }
@@ -174,7 +174,7 @@ export default async function VoidRequestPage() {
                         </div>
                         <div>
                           <Link
-                            href={entityHref(req.entity)}
+                            href={entityHref(req.entity, req.entityId)}
                             className="text-xs font-medium text-[#2f7d98] hover:underline"
                           >
                             View source record

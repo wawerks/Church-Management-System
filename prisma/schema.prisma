@@ -212,6 +212,12 @@ model ExpenseType {
 
 model ActionLog {
   id        String   @id @default(cuid())
+  userId    String?
+  actionType String?
+  module    String?
+  oldValue  Json?
+  newValue  Json?
+  timestamp DateTime @default(now())
   actorId   String?
   actorName String
   actorRole Role
@@ -224,6 +230,9 @@ model ActionLog {
   actor User? @relation("ActionLogActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+  @@index([timestamp])
+  @@index([userId, timestamp])
+  @@index([module, timestamp])
   @@index([actorRole, createdAt])
   @@index([entity, createdAt])
 }

@@ -44,7 +44,15 @@ export async function updateSelfProfileAction(
 
   const existing = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      phoneNumber: true,
+      address: true,
+      birthdate: true,
+    },
   });
 
   if (!existing) redirect("/login");
@@ -61,13 +69,19 @@ export async function updateSelfProfileAction(
   });
 
   await logAction({
-    action: "UPDATE",
-    entity: "User",
+    actionType: "UPDATE",
+    module: "UserProfile",
     entityId: updated.id,
-    details: {
-      name: { from: existing.name, to: updated.name },
-      phoneNumber: phoneNumber ?? null,
-      address: address ?? null,
+    oldValue: {
+      name: existing.name,
+      phoneNumber: existing.phoneNumber ?? null,
+      address: existing.address ?? null,
+      birthdate: existing.birthdate?.toISOString() ?? null,
+    },
+    newValue: {
+      name: updated.name,
+      phoneNumber: normalizedPhone,
+      address: normalizedAddress,
       birthdate: normalizedBirthdate?.toISOString() ?? null,
     },
   });
@@ -93,10 +107,11 @@ export async function deleteSelfProfileAction(userId: string): Promise<void> {
   });
 
   await logAction({
-    action: "DELETE",
-    entity: "User",
+    actionType: "DELETE",
+    module: "UserProfile",
     entityId: deleted.id,
-    details: { name: deleted.name, email: deleted.email, role: deleted.role },
+    oldValue: { name: deleted.name, email: deleted.email, role: deleted.role },
+    newValue: null,
   });
 
   await signOutAndClearCookie();
