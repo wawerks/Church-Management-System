@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { createMemberAction } from "../app/(protected)/members/actions";
+import { useActionState, useMemo, useState } from "react";
+import {
+  createMemberModalAction,
+  type CreateMemberModalState,
+} from "../app/(protected)/members/actions";
 import { SubmitButton } from "./form-buttons";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
@@ -14,6 +17,16 @@ export function AddMemberModal({
 }) {
   type ModalState = "closed" | "opening" | "open" | "closing";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const initialFormState = useMemo<CreateMemberModalState>(
+    () => ({ ok: null, message: null }),
+    [],
+  );
+  const [formState, formAction] = useActionState(
+    createMemberModalAction,
+    initialFormState,
+  );
+  const [openSessionId, setOpenSessionId] = useState(0);
+  const [submitSessionId, setSubmitSessionId] = useState<number | null>(null);
 
   // Remount AddressAutocomplete each open to reset its internal state.
   const [instanceKey, setInstanceKey] = useState(0);
@@ -49,6 +62,8 @@ export function AddMemberModal({
 
   function openModal() {
     reset();
+    setSubmitSessionId(null);
+    setOpenSessionId((v) => v + 1);
     setModalState("opening");
     window.setTimeout(() => setModalState("open"), 20);
   }
@@ -66,6 +81,10 @@ export function AddMemberModal({
     modalState === "open"
       ? "translate-y-0 scale-100 opacity-100"
       : "translate-y-2 scale-95 opacity-0";
+
+  const shouldShowResult =
+    submitSessionId === openSessionId && formState.ok !== null;
+  const isSuccessResult = shouldShowResult && formState.ok;
 
   return (
     <>
@@ -90,30 +109,86 @@ export function AddMemberModal({
           />
 
           <div
-            className={`relative w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
+            className={`relative transition-all duration-180 ease-out ${panelClassName} ${
+              isSuccessResult
+                ? "w-auto max-w-none bg-transparent p-0 shadow-none border-0"
+                : "w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-lg"
+            }`}
           >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  Add Member
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Enter member details and assign to a family group.
-                </p>
+            {!isSuccessResult ? (
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Add Member
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Enter member details and assign to a family group.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  X
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                X
-              </button>
-            </div>
+            ) : null}
 
+            {shouldShowResult && formState.ok ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-64 rounded-xl border border-emerald-200 bg-white p-6 text-center shadow-sm">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="h-6 w-6 text-emerald-700"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M20 6L9 17l-5-5"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-base font-semibold text-slate-900">
+                    Member added
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : shouldShowResult ? (
+              <div className="space-y-4 py-4">
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+                  <div className="font-semibold">Unable to add member</div>
+                  <div className="mt-1">{formState.message}</div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form
-              action={createMemberAction}
+              action={formAction}
               className="space-y-5"
-              onSubmit={() => setModalState("closing")}
+              onSubmit={() => setSubmitSessionId(openSessionId)}
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
@@ -260,6 +335,7 @@ export function AddMemberModal({
                 </SubmitButton>
               </div>
             </form>
+            )}
           </div>
         </div>
       ) : null}

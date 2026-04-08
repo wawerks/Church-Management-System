@@ -118,7 +118,11 @@ export default async function ProtectedLayout({
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <MobileNav role={session.role} pendingVoidCount={pendingVoidCount} />
-          <main className="flex-1 overflow-y-auto p-4">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4">
+            <div className="min-h-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </div>

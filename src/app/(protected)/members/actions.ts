@@ -24,7 +24,16 @@ function emptyToUndefined(v: string | undefined) {
   return s.length === 0 ? undefined : s;
 }
 
-export async function createMemberAction(formData: FormData) {
+function normalizeName(v: string) {
+  return v.trim().replace(/\s+/g, " ");
+}
+
+export type CreateMemberModalState = {
+  ok: boolean | null;
+  message: string | null;
+};
+
+async function createMemberCore(formData: FormData) {
   await requireRole(["ADMIN", "STAFF"] satisfies Role[]);
 
   const parsed = MemberSchema.safeParse({
@@ -43,6 +52,19 @@ export async function createMemberAction(formData: FormData) {
   }
 
   const data = parsed.data;
+  const firstName = normalizeName(data.firstName);
+  const lastName = normalizeName(data.lastName);
+  if (!firstName || !lastName) {
+    throw new Error("First name and last name are required.");
+  }
+
+  const existingMember = await prisma.member.findFirst({
+    where: { firstName, lastName },
+    select: { id: true },
+  });
+  if (existingMember) {
+    throw new Error("Member already exists.");
+  }
 
   let familyGroupId: string | undefined = emptyToUndefined(data.familyGroupId);
   const familyGroupName = emptyToUndefined(data.familyGroupName);
@@ -66,8 +88,8 @@ export async function createMemberAction(formData: FormData) {
 
   const member = await prisma.member.create({
     data: {
-      firstName: data.firstName,
-      lastName: data.lastName,
+      firstName,
+      lastName,
       gender: data.gender ? data.gender : undefined,
       birthdate,
       contactNumber: emptyToUndefined(data.contactNumber),
@@ -82,8 +104,27 @@ export async function createMemberAction(formData: FormData) {
     details: { firstName: member.firstName, lastName: member.lastName },
   });
 
-  // Go back to list
+  return member;
+}
+
+export async function createMemberAction(formData: FormData) {
+  await createMemberCore(formData);
   redirect("/members");
+}
+
+export async function createMemberModalAction(
+  _prevState: CreateMemberModalState,
+  formData: FormData,
+): Promise<CreateMemberModalState> {
+  try {
+    await createMemberCore(formData);
+    return { ok: true, message: "Member added." };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Unable to save member.",
+    };
+  }
 }
 
 export async function updateMemberAction(
