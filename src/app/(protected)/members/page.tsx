@@ -135,7 +135,10 @@ export default async function MembersPage(props: {
                 </tr>
               ) : (
                 members.map((m) => (
-                  <tr key={m.id} className="border-t border-slate-100">
+                  <tr
+                    key={m.id}
+                    className="border-t border-slate-100 odd:bg-white even:bg-slate-50"
+                  >
                     <td className="px-4 py-3 font-medium">
                       {m.firstName} {m.lastName}
                     </td>
