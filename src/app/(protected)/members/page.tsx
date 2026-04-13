@@ -103,9 +103,9 @@ export default async function MembersPage(props: {
       ) : null}
 
       <div className="flex h-[calc(100vh-140px)] flex-col rounded-xl border border-slate-200 bg-white">
-        <div className="overflow-x-auto border-b border-slate-100">
-          <table className="min-w-full table-fixed text-sm">
-            <thead className="bg-slate-50">
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="min-w-full table-fixed border-collapse text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_0_rgb(226_232_240)] [&_th]:bg-slate-50">
               <tr className="text-left text-slate-700">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Gender</th>
@@ -118,11 +118,6 @@ export default async function MembersPage(props: {
                 ) : null}
               </tr>
             </thead>
-          </table>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="min-w-full table-fixed text-sm">
             <tbody>
               {members.length === 0 ? (
                 <tr>
