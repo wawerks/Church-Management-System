@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { createUserAction } from "../app/(protected)/users/actions";
 import { SubmitButton } from "./form-buttons";
 
@@ -9,6 +10,11 @@ type RoleValue = "ADMIN" | "PASTOR" | "STAFF" | "TREASURER";
 export function AddUserModal() {
   type ModalState = "closed" | "opening" | "open" | "closing";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -58,21 +64,22 @@ export function AddUserModal() {
         + Add user
       </button>
 
-      {isMounted ? (
+      {isMounted && portalRoot ? createPortal(
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          className="fixed inset-y-0 left-0 right-0 z-[200] overflow-y-auto md:left-72"
           role="dialog"
           aria-modal="true"
           aria-label="Add user"
         >
           <div
-            className={`fixed inset-0 bg-black/40 transition-opacity duration-180 ease-out ${overlayClassName}`}
+            className={`fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-180 ease-out md:left-72 ${overlayClassName}`}
             onClick={closeModal}
           />
 
-          <div
-            className={`relative w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
-          >
+          <div className="flex min-h-full w-full items-center justify-center p-4">
+            <div
+              className={`relative mx-auto w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
+            >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
@@ -220,8 +227,10 @@ export function AddUserModal() {
                 </SubmitButton>
               </div>
             </form>
+            </div>
           </div>
-        </div>
+        </div>,
+        portalRoot
       ) : null}
     </>
   );

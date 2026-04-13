@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { SubmitButton } from "./form-buttons";
 import { updateSelfProfileAction } from "../app/(protected)/profile/actions";
 
@@ -25,11 +26,16 @@ export function EditProfileModal({
 }) {
   type ModalState = "closed" | "closing" | "open";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
   const [localName, setLocalName] = useState(name);
   const [localPhone, setLocalPhone] = useState(phoneNumber ?? "");
   const [localAddress, setLocalAddress] = useState(address ?? "");
   const [localBirthdate, setLocalBirthdate] = useState(birthdateInput);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -47,29 +53,29 @@ export function EditProfileModal({
 
   const isMounted = modalState !== "closed";
 
-  if (!isMounted) return null;
+  if (!isMounted || !portalRoot) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+      className="fixed inset-y-0 left-0 right-0 z-[210] overflow-y-auto md:left-72"
       role="dialog"
       aria-modal="true"
       aria-label="Edit profile"
     >
       <div
-        className="fixed inset-0 bg-black/40"
+        className="fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] md:left-72"
         onClick={() => {
           onClose();
         }}
       />
-
-      <div
-        className={[
-          "relative w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-8 shadow-lg",
-          modalState === "closing" ? "translate-y-2 scale-[0.98] opacity-0 transition-all duration-180" : "",
-          modalState === "open" ? "opacity-100 translate-y-0 scale-100 transition-all duration-0" : "",
-        ].join(" ")}
-      >
+      <div className="flex min-h-full w-full items-center justify-center p-4">
+        <div
+          className={[
+            "relative mx-auto w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-8 shadow-lg",
+            modalState === "closing" ? "translate-y-2 scale-[0.98] opacity-0 transition-all duration-180" : "",
+            modalState === "open" ? "opacity-100 translate-y-0 scale-100 transition-all duration-0" : "",
+          ].join(" ")}
+        >
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-slate-900">
@@ -161,8 +167,10 @@ export function EditProfileModal({
             </SubmitButton>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </div>,
+    portalRoot
   );
 }
 

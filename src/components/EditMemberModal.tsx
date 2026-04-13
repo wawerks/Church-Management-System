@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Gender } from "@/generated/prisma/enums";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { SubmitButton } from "./form-buttons";
@@ -37,6 +38,7 @@ export function EditMemberModal({
 }) {
   type ModalState = "closed" | "closing" | "open";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
   const [localFirstName, setLocalFirstName] = useState(firstName);
   const [localLastName, setLocalLastName] = useState(lastName);
@@ -54,6 +56,10 @@ export function EditMemberModal({
 
   // AddressAutocomplete manages the `address` input internally.
   const [addressKey, setAddressKey] = useState(0);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -84,25 +90,25 @@ export function EditMemberModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
 
-  if (modalState === "closed") return null;
+  if (modalState === "closed" || !portalRoot) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+      className="fixed inset-y-0 left-0 right-0 z-[210] overflow-y-auto md:left-72"
       role="dialog"
       aria-modal="true"
       aria-label="Edit member"
     >
       <div
-        className="fixed inset-0 bg-black/40"
+        className="fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] md:left-72"
         onClick={() => {
           onClose();
         }}
       />
-
+      <div className="flex min-h-full w-full items-center justify-center p-4">
       <div
         className={[
-          "relative w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 text-left shadow-lg",
+          "relative mx-auto w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 text-left shadow-lg",
           modalState === "closing"
             ? "translate-y-2 scale-[0.98] opacity-0 transition-all duration-180"
             : "opacity-100 translate-y-0 scale-100 transition-all duration-180",
@@ -275,7 +281,9 @@ export function EditMemberModal({
           </div>
         </form>
       </div>
-    </div>
+      </div>
+    </div>,
+    portalRoot
   );
 }
 

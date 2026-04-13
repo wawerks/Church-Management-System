@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   createMemberModalAction,
   type CreateMemberModalState,
@@ -17,6 +18,10 @@ export function AddMemberModal({
 }) {
   type ModalState = "closed" | "opening" | "open" | "closing";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
   const initialFormState = useMemo<CreateMemberModalState>(
     () => ({ ok: null, message: null }),
     [],
@@ -96,15 +101,15 @@ export function AddMemberModal({
         + Add Member
       </button>
 
-      {isMounted ? (
+      {isMounted && portalRoot ? createPortal(
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          className="fixed inset-y-0 left-0 right-0 z-[200] flex items-center justify-center p-4 md:left-72"
           role="dialog"
           aria-modal="true"
           aria-label="Add Member"
         >
           <div
-            className={`fixed inset-0 bg-black/40 transition-opacity duration-180 ease-out ${overlayClassName}`}
+            className={`fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-180 ease-out md:left-72 ${overlayClassName}`}
             onClick={closeModal}
           />
 
@@ -337,7 +342,8 @@ export function AddMemberModal({
             </form>
             )}
           </div>
-        </div>
+        </div>,
+        portalRoot
       ) : null}
     </>
   );

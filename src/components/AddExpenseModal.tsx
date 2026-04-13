@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { createExpenseAction } from "../app/(protected)/expenses/actions";
 import { SubmitButton } from "./form-buttons";
 
@@ -33,6 +34,7 @@ export function AddExpenseModal({
 }) {
   type ModalState = "closed" | "opening" | "open" | "closing";
   const [modalState, setModalState] = useState<ModalState>("closed");
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
   const defaultDate = budgetMonth ? `${budgetMonth}-01` : "";
 
@@ -70,6 +72,10 @@ export function AddExpenseModal({
     setAmount(suggestedAmount.toFixed(2));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usingAutoCompute, suggestedAmount]);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   function reset() {
     setType(expenseTypes[0]?.name ?? "");
@@ -110,21 +116,21 @@ export function AddExpenseModal({
         + Add Expense
       </button>
 
-      {isMounted ? (
+      {isMounted && portalRoot ? createPortal(
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          className="fixed inset-y-0 left-0 right-0 z-[200] overflow-y-auto md:left-72"
           role="dialog"
           aria-modal="true"
           aria-label="Add Expense"
         >
           <div
-            className={`fixed inset-0 bg-black/40 transition-opacity duration-180 ease-out ${overlayClassName}`}
+            className={`fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-180 ease-out md:left-72 ${overlayClassName}`}
             onClick={closeModal}
           />
-
-          <div
-            className={`relative w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
-          >
+          <div className="flex min-h-full w-full items-start justify-center p-4 pt-25">
+            <div
+              className={`relative mx-auto w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
+            >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
@@ -327,8 +333,10 @@ export function AddExpenseModal({
                 </SubmitButton>
               </div>
             </form>
+            </div>
           </div>
-        </div>
+        </div>,
+        portalRoot
       ) : null}
     </>
   );

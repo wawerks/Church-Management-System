@@ -68,20 +68,21 @@ export function AddEventModal() {
       {isMounted && portalReady
         ? createPortal(
             <div
-              className="fixed inset-0 z-[200]"
+              className="fixed inset-y-0 left-0 right-0 z-[200] overflow-y-auto md:left-72"
               role="dialog"
               aria-modal="true"
               aria-label="Add Event"
             >
               <div
-                className={`fixed inset-0 bg-black/40 transition-opacity duration-180 ease-out ${overlayClassName}`}
+                className={`fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-180 ease-out md:left-72 ${overlayClassName}`}
                 onClick={closeModal}
               />
 
-              <div
-                ref={panelRef}
-                className={`fixed left-1/2 top-1/2 z-[201] w-[calc(100vw-2rem)] max-w-md max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
-              >
+              <div className="flex min-h-full w-full items-center justify-center p-4">
+                <div
+                  ref={panelRef}
+                  className={`relative z-[201] w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg transition-all duration-180 ease-out ${panelClassName}`}
+                >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">
@@ -154,6 +155,7 @@ export function AddEventModal() {
                     </SubmitButton>
                   </div>
                 </form>
+                </div>
               </div>
             </div>,
             document.body,
