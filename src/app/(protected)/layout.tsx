@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { LogoutButton } from "@/components/LogoutButton";
 import type { Role } from "@/generated/prisma/enums";
 import { canManageUsers, canRequestFinancialVoid } from "@/lib/permissions";
+import { roleLabel } from "@/lib/role-label";
 import { prisma } from "@/lib/prisma";
 
 function MobileNav(props: { role: Role; pendingVoidCount: number }) {
@@ -63,7 +64,7 @@ function MobileNav(props: { role: Role; pendingVoidCount: number }) {
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">Church Admin</div>
-          <div className="truncate text-xs text-slate-600">{role}</div>
+          <div className="truncate text-xs text-slate-600">{roleLabel(role)}</div>
         </div>
         <LogoutButton />
       </div>

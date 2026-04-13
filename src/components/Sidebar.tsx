@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { LogoutButton } from "@/components/LogoutButton";
 import { canManageUsers, canRequestFinancialVoid } from "@/lib/permissions";
+import { roleLabel } from "@/lib/role-label";
 
 type IconName =
   | "dashboard"
@@ -217,7 +218,7 @@ export function Sidebar(props: {
             {(props.userName ?? "Church Admin").toUpperCase()}
           </div>
           <p className="mt-1 text-center text-[10px] font-medium text-[#a8b8d4]">
-            View profile
+            {roleLabel(role)}
           </p>
         </Link>
 
