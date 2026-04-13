@@ -26,12 +26,12 @@ export async function logAction(params: LogActionParams) {
 
   const actionType = params.actionType ?? params.action ?? "UNKNOWN";
   const moduleName = params.module ?? params.entity ?? "General";
-  const oldValue = params.oldValue ?? null;
+  const oldValue = params.oldValue ?? undefined;
   const newValue =
     params.newValue ??
     (params.details
       ? (params.details as unknown as Prisma.InputJsonValue)
-      : null);
+      : undefined);
 
   await prisma.actionLog.create({
     data: {

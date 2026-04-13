@@ -45,6 +45,24 @@ enum VoidRequestStatus {
   DECLINED
 }
 
+enum FinancialActivityCategory {
+  CORE
+  PROJECT
+  SUPPORT
+}
+
+enum FinancialPeriodStatus {
+  DRAFT
+  LOCKED
+  FINALIZED
+}
+
+enum IncomeEntryKind {
+  OPENING
+  WEEKLY
+  ADJUSTMENT
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -208,6 +226,8 @@ model ExpenseType {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  activityTemplate FinancialActivityTemplate?
 }
 
 model ActionLog {
@@ -235,4 +255,244 @@ model ActionLog {
   @@index([module, timestamp])
   @@index([actorRole, createdAt])
   @@index([entity, createdAt])
+}
+
+model FinancialRuleSet {
+  id String @id @default(cuid())
+
+  name          String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean @default(true)
+
+  conferencePercent Decimal @db.Decimal(5, 2)
+  missionPercent    Decimal @db.Decimal(5, 2)
+  armPercent        Decimal @db.Decimal(5, 2)
+  llbcPercent       Decimal @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  periods FinancialPeriod[]
+
+  @@index([effectiveFrom, effectiveTo])
+}
+
+model FinancialActivityTemplate {
+  id String @id @default(cuid())
+
+  name        String
+  category    FinancialActivityCategory
+  standardPct Decimal @db.Decimal(7, 4)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  expenseTypeId String? @unique
+  expenseType   ExpenseType? @relation(fields: [expenseTypeId], references: [id], onDelete: SetNull)
+
+  ledgers FinancialActivityLedger[]
+  snapshots FinancialMonthlySnapshotActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, category])
+  @@index([category, sortOrder, isActive])
+}
+
+model FinancialPeriod {
+  id String @id @default(cuid())
+
+  monthKey String @unique // YYYY-MM
+  title    String?
+  status   FinancialPeriodStatus @default(DRAFT)
+
+  openingBalance    Decimal @default(0) @db.Decimal(12, 2)
+  monthlyIncome     Decimal @default(0) @db.Decimal(12, 2)
+  allocatedBudget   Decimal @default(0) @db.Decimal(12, 2)
+  actualExpenses    Decimal @default(0) @db.Decimal(12, 2)
+  closingBalance    Decimal @default(0) @db.Decimal(12, 2)
+  adjustmentAmount  Decimal @default(0) @db.Decimal(12, 2)
+  periodStart       DateTime
+  periodEndExclusive DateTime
+
+  ruleSetId String?
+  ruleSet   FinancialRuleSet? @relation(fields: [ruleSetId], references: [id], onDelete: SetNull)
+
+  incomeEntries FinancialWeeklyIncomeEntry[]
+  activityLedgers FinancialActivityLedger[]
+  remittanceLedger FinancialRemittanceLedger?
+  snapshots FinancialMonthlySnapshot[]
+  conferenceRows FinancialConferenceMonthly[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodStart, periodEndExclusive])
+  @@index([status, periodStart])
+}
+
+model FinancialWeeklyIncomeEntry {
+  id String @id @default(cuid())
+
+  periodId String
+  period   FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  kind      IncomeEntryKind @default(WEEKLY)
+  label     String
+  sortOrder Int    @default(0)
+  amount    Decimal @db.Decimal(12, 2)
+  entryDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodId, sortOrder])
+  @@unique([periodId, sortOrder])
+}
+
+model FinancialActivityLedger {
+  id String @id @default(cuid())
+
+  periodId   String
+  activityId String
+
+  period   FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  activity FinancialActivityTemplate @relation(fields: [activityId], references: [id], onDelete: Restrict)
+
+  standardPct      Decimal @db.Decimal(7, 4)
+  carryOverIn      Decimal @default(0) @db.Decimal(12, 2)
+  allocatedAmount  Decimal @default(0) @db.Decimal(12, 2)
+  adjustmentAmount Decimal @default(0) @db.Decimal(12, 2)
+  expenseAmount    Decimal @default(0) @db.Decimal(12, 2)
+  endingBalance    Decimal @default(0) @db.Decimal(12, 2)
+  remarks          String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId, activityId])
+  @@index([activityId, periodId])
+}
+
+model FinancialRemittanceLedger {
+  id String @id @default(cuid())
+
+  periodId String @unique
+  period   FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  incomeBase Decimal @default(0) @db.Decimal(12, 2)
+
+  conferencePercent Decimal @db.Decimal(5, 2)
+  missionPercent    Decimal @db.Decimal(5, 2)
+  armPercent        Decimal @db.Decimal(5, 2)
+  llbcPercent       Decimal @db.Decimal(5, 2)
+
+  conferenceAmount Decimal @default(0) @db.Decimal(12, 2)
+  missionAmount    Decimal @default(0) @db.Decimal(12, 2)
+  armAmount        Decimal @default(0) @db.Decimal(12, 2)
+  llbcAmount       Decimal @default(0) @db.Decimal(12, 2)
+  totalRemittance  Decimal @default(0) @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FinancialMonthlySnapshot {
+  id String @id @default(cuid())
+
+  periodId String
+  period   FinancialPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  totalIncome         Decimal @default(0) @db.Decimal(12, 2)
+  totalExpense        Decimal @default(0) @db.Decimal(12, 2)
+  totalRemittance     Decimal @default(0) @db.Decimal(12, 2)
+  netBalance          Decimal @default(0) @db.Decimal(12, 2)
+  conferenceAmount    Decimal @default(0) @db.Decimal(12, 2)
+  missionAmount       Decimal @default(0) @db.Decimal(12, 2)
+  armAmount           Decimal @default(0) @db.Decimal(12, 2)
+  llbcAmount          Decimal @default(0) @db.Decimal(12, 2)
+  createdByUserId     String?
+  snapshotNote        String? @db.VarChar(1000)
+
+  activities FinancialMonthlySnapshotActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodId, createdAt])
+}
+
+model FinancialMonthlySnapshotActivity {
+  id String @id @default(cuid())
+
+  snapshotId String
+  snapshot   FinancialMonthlySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  activityId String
+  activity   FinancialActivityTemplate @relation(fields: [activityId], references: [id], onDelete: Restrict)
+
+  standardPct      Decimal @db.Decimal(7, 4)
+  carryOverIn      Decimal @default(0) @db.Decimal(12, 2)
+  allocatedAmount  Decimal @default(0) @db.Decimal(12, 2)
+  adjustmentAmount Decimal @default(0) @db.Decimal(12, 2)
+  expenseAmount    Decimal @default(0) @db.Decimal(12, 2)
+  endingBalance    Decimal @default(0) @db.Decimal(12, 2)
+
+  @@unique([snapshotId, activityId])
+}
+
+model FinancialConferenceMonthly {
+  id String @id @default(cuid())
+
+  monthKey String @unique
+  periodId String?
+  period   FinancialPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
+
+  income           Decimal @default(0) @db.Decimal(12, 2)
+  actualExpenses   Decimal @default(0) @db.Decimal(12, 2)
+  actualRemittance Decimal @default(0) @db.Decimal(12, 2)
+  missionAmount    Decimal @default(0) @db.Decimal(12, 2)
+  armAmount        Decimal @default(0) @db.Decimal(12, 2)
+  llbcAmount       Decimal @default(0) @db.Decimal(12, 2)
+  conferenceAmount Decimal @default(0) @db.Decimal(12, 2)
+  netBalance       Decimal @default(0) @db.Decimal(12, 2)
+  appliedPercent   Decimal @default(0) @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodId])
+}
+
+model FinancialImportBatch {
+  id String @id @default(cuid())
+
+  sourceFile      String
+  sourceHash      String?
+  importedByUserId String?
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  status          String
+  summary         Json?
+
+  entries FinancialImportEntry[]
+}
+
+model FinancialImportEntry {
+  id String @id @default(cuid())
+
+  batchId String
+  batch   FinancialImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  sourceSheet String
+  sourceRow   Int?
+  sourceCol   Int?
+  recordType  String
+  targetId    String?
+  payload     Json?
+  error       String? @db.VarChar(1000)
+  createdAt   DateTime @default(now())
+
+  @@index([batchId, sourceSheet])
 }

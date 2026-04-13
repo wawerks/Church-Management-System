@@ -7,6 +7,7 @@ import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { markPendingVoidRequestsSuperseded } from "@/lib/void-pending";
+import { assertFinancialPeriodWritableByDate } from "@/lib/financial-period-guard";
 
 const ServiceIncomeSchema = z.object({
   serviceDate: z.string().min(1),
@@ -30,6 +31,7 @@ export async function createServiceIncomeAction(formData: FormData) {
   if (Number.isNaN(date.getTime())) {
     throw new Error("Invalid service date");
   }
+  await assertFinancialPeriodWritableByDate(date);
 
   const entry = await prisma.serviceIncome.upsert({
     where: { serviceDate: date },

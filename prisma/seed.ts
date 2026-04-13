@@ -58,6 +58,31 @@ const BUDGET_EXPENSE_TYPES: ReadonlyArray<{
   { name: "Supplies and Materials", allocationPercent: 1 },
 ];
 
+const WORKBOOK_ACTIVITY_TEMPLATES: ReadonlyArray<{
+  name: string;
+  category: "CORE" | "PROJECT" | "SUPPORT";
+  standardPct: number;
+  sortOrder: number;
+}> = [
+  { name: "Monthly Prayer and Thanksgiving Session", category: "CORE", standardPct: 0.01, sortOrder: 10 },
+  { name: "Evangelism/Discipleship/Revival/Children's Vacation Bible School (VBS)/Camp", category: "CORE", standardPct: 0.03, sortOrder: 20 },
+  { name: "Pastor's Appreciation", category: "CORE", standardPct: 0.005, sortOrder: 30 },
+  { name: "Conference Calls Attendance", category: "CORE", standardPct: 0.02, sortOrder: 40 },
+  { name: "Thanksgiving Celebration and Christmas Celebration", category: "CORE", standardPct: 0.03, sortOrder: 50 },
+  { name: "Youth Fellowship", category: "CORE", standardPct: 0.03, sortOrder: 60 },
+  { name: "Floor Tiling/Pathway/Youth Center/Lot Survey/Perimeter Fencing", category: "PROJECT", standardPct: 0.02, sortOrder: 110 },
+  { name: "Mission", category: "SUPPORT", standardPct: 0.01, sortOrder: 210 },
+  { name: "ARM", category: "SUPPORT", standardPct: 0.01, sortOrder: 220 },
+  { name: "Conference Contribution", category: "SUPPORT", standardPct: 0.07, sortOrder: 230 },
+  { name: "LLBC Aid", category: "SUPPORT", standardPct: 0.01, sortOrder: 240 },
+  { name: "Host Pastor's Honorarium", category: "SUPPORT", standardPct: 0.42, sortOrder: 250 },
+  { name: "Assistant Pastor's Allowance", category: "SUPPORT", standardPct: 0.175, sortOrder: 260 },
+  { name: "Treasurer's Honorarium", category: "SUPPORT", standardPct: 0.03, sortOrder: 270 },
+  { name: "Church Maintenance", category: "SUPPORT", standardPct: 0.03, sortOrder: 280 },
+  { name: "Electricity", category: "SUPPORT", standardPct: 0.025, sortOrder: 290 },
+  { name: "Musical Equipment/Sound System Maintenance", category: "SUPPORT", standardPct: 0.01, sortOrder: 300 },
+];
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -131,6 +156,66 @@ async function main() {
         update: {
           allocationPercent: row.allocationPercent,
           isAllocatedFromServiceIncome: true,
+        },
+      });
+    }
+
+    await prisma.financialRuleSet.upsert({
+      where: { id: "workbook-rule-jan-apr" },
+      create: {
+        id: "workbook-rule-jan-apr",
+        name: "Workbook Jan-Apr Rule",
+        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveTo: new Date("2025-05-01T00:00:00.000Z"),
+        conferencePercent: 10,
+        missionPercent: 1,
+        armPercent: 1,
+        llbcPercent: 1,
+        isActive: true,
+      },
+      update: {
+        name: "Workbook Jan-Apr Rule",
+        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveTo: new Date("2025-05-01T00:00:00.000Z"),
+        conferencePercent: 10,
+        missionPercent: 1,
+        armPercent: 1,
+        llbcPercent: 1,
+        isActive: true,
+      },
+    });
+    await prisma.financialRuleSet.upsert({
+      where: { id: "workbook-rule-may-dec" },
+      create: {
+        id: "workbook-rule-may-dec",
+        name: "Workbook May-Dec Rule",
+        effectiveFrom: new Date("2025-05-01T00:00:00.000Z"),
+        conferencePercent: 7,
+        missionPercent: 1,
+        armPercent: 1,
+        llbcPercent: 1,
+        isActive: true,
+      },
+      update: {
+        name: "Workbook May-Dec Rule",
+        effectiveFrom: new Date("2025-05-01T00:00:00.000Z"),
+        effectiveTo: null,
+        conferencePercent: 7,
+        missionPercent: 1,
+        armPercent: 1,
+        llbcPercent: 1,
+        isActive: true,
+      },
+    });
+
+    for (const row of WORKBOOK_ACTIVITY_TEMPLATES) {
+      await prisma.financialActivityTemplate.upsert({
+        where: { name_category: { name: row.name, category: row.category } },
+        create: row,
+        update: {
+          standardPct: row.standardPct,
+          sortOrder: row.sortOrder,
+          isActive: true,
         },
       });
     }

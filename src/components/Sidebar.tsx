@@ -20,6 +20,7 @@ type IconName =
   | "events"
   | "reportFinancial"
   | "reportAttendance"
+  | "workbook"
   | "logs";
 
 function NavIcon({ name }: { name: IconName }) {
@@ -69,7 +70,7 @@ function NavIcon({ name }: { name: IconName }) {
       </svg>
     );
   }
-  if (name === "logs") {
+  if (name === "workbook" || name === "logs") {
     return (
       <svg viewBox="0 0 24 24" fill="none" className={common}>
         <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5h10V6H7v2Zm0 4h10v-2H7v2Zm0 4h7v-2H7v2Z" fill="currentColor" />
@@ -186,6 +187,12 @@ export function Sidebar(props: {
       href: "/reports/attendance",
       label: "Attendance Reports",
       icon: "reportAttendance",
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
+    },
+    {
+      href: "/workbook",
+      label: "Workbook Plan",
+      icon: "workbook",
       roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
     ...(canManageUsers(role)

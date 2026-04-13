@@ -111,7 +111,7 @@ export async function deleteSelfProfileAction(userId: string): Promise<void> {
     module: "UserProfile",
     entityId: deleted.id,
     oldValue: { name: deleted.name, email: deleted.email, role: deleted.role },
-    newValue: null,
+    newValue: { deleted: true },
   });
 
   await signOutAndClearCookie();

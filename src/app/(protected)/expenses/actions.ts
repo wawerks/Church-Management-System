@@ -7,6 +7,7 @@ import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { markPendingVoidRequestsSuperseded } from "@/lib/void-pending";
+import { assertFinancialPeriodWritableByDate } from "@/lib/financial-period-guard";
 
 const ExpenseSchema = z.object({
   type: z.string().min(1),
@@ -42,6 +43,7 @@ export async function createExpenseAction(formData: FormData) {
   if (Number.isNaN(expenseDate.getTime())) {
     throw new Error("Invalid date");
   }
+  await assertFinancialPeriodWritableByDate(expenseDate);
 
   const validType = await prisma.expenseType.findUnique({
     where: { name: type },

@@ -7,6 +7,7 @@ import { logAction } from "@/lib/action-log";
 import { redirect } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { markPendingVoidRequestsSuperseded } from "@/lib/void-pending";
+import { assertFinancialPeriodWritableByDate } from "@/lib/financial-period-guard";
 
 const DonationSchema = z
   .object({
@@ -37,6 +38,10 @@ export async function createDonationAction(formData: FormData) {
 
   const { memberId, memberName, amount, type, date } = parsed.data;
   const donationDate = new Date(date);
+  if (Number.isNaN(donationDate.getTime())) {
+    throw new Error("Invalid donation date");
+  }
+  await assertFinancialPeriodWritableByDate(donationDate);
 
   // Resolve member from either memberId or typed memberName.
   let resolvedMemberId: string | null = null;

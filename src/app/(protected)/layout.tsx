@@ -54,6 +54,11 @@ function MobileNav(props: { role: Role; pendingVoidCount: number }) {
       label: "Att. Reports",
       roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
     },
+    {
+      href: "/workbook",
+      label: "Workbook",
+      roles: ["ADMIN", "PASTOR", "STAFF", "TREASURER"],
+    },
     ...(canManageUsers(role)
       ? [{ href: "/logs", label: "Logs", roles: ["ADMIN"] as Role[] }]
       : []),

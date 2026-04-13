@@ -35,74 +35,80 @@ export default async function EditEventPage(props: {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Edit Event</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Update title/description and service date.
-          </p>
-        </div>
-        <Link
-          href="/events"
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Back
-        </Link>
-      </div>
+    <div className="fixed inset-y-0 left-0 right-0 z-[210] overflow-y-auto md:left-72">
+      <div className="fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] md:left-72" />
 
-      <form
-        action={updateEventAction.bind(null, event.id)}
-        className="space-y-5"
-      >
-        <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">Title</div>
-          <input
-            name="title"
-            required
-            defaultValue={event.title}
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-          />
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">
-            Description
+      <div className="flex min-h-full w-full items-center justify-center p-4">
+        <div className="relative mx-auto w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg md:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-base font-semibold text-slate-900">Edit Event</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Update title/description and service date.
+              </p>
+            </div>
+            <Link
+              href="/events"
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              X
+            </Link>
           </div>
-          <textarea
-            name="description"
-            defaultValue={event.description ?? ""}
-            className="min-h-[90px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-          />
-        </label>
 
-        <label className="block">
-          <div className="mb-1 text-sm font-medium text-slate-700">Date</div>
-          <input
-            name="date"
-            type="date"
-            required
-            defaultValue={toDateInputValue(event.date)}
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-          />
-        </label>
+          <form
+            action={updateEventAction.bind(null, event.id)}
+            className="space-y-5"
+          >
+            <label className="block">
+              <div className="mb-1 text-sm font-medium text-slate-700">Title</div>
+              <input
+                name="title"
+                required
+                defaultValue={event.title}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
+            </label>
 
-        <div className="flex justify-end gap-2">
-          <Link
-            href="/events"
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Cancel
-          </Link>
-          <ConfirmSubmitButton
-            pendingLabel="Saving…"
-            confirmMessage="Save changes to this event?"
-            className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
-          >
-            Save Changes
-          </ConfirmSubmitButton>
+            <label className="block">
+              <div className="mb-1 text-sm font-medium text-slate-700">
+                Description
+              </div>
+              <textarea
+                name="description"
+                defaultValue={event.description ?? ""}
+                className="min-h-[90px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-sm font-medium text-slate-700">Date</div>
+              <input
+                name="date"
+                type="date"
+                required
+                defaultValue={toDateInputValue(event.date)}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Link
+                href="/events"
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </Link>
+              <ConfirmSubmitButton
+                pendingLabel="Saving…"
+                confirmMessage="Save changes to this event?"
+                className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-black/90"
+              >
+                Save Changes
+              </ConfirmSubmitButton>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

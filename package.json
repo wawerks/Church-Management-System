@@ -9,7 +9,10 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "workbook:import": "tsx scripts/import-workbook.ts",
+    "workbook:reconcile": "tsx scripts/reconcile-workbook.ts",
+    "workbook:test-engine": "tsx scripts/workbook-engine-smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -27,6 +30,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
