@@ -35,11 +35,8 @@ export default async function EditEventPage(props: {
   }
 
   return (
-    <div className="fixed inset-y-0 left-0 right-0 z-[210] overflow-y-auto md:left-72">
-      <div className="fixed inset-y-0 left-0 right-0 bg-black/40 backdrop-blur-[1px] md:left-72" />
-
-      <div className="flex min-h-full w-full items-center justify-center p-4">
-        <div className="relative mx-auto w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg md:p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 md:p-6">
+      <div className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-lg md:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h1 className="text-base font-semibold text-slate-900">Edit Event</h1>
@@ -107,7 +104,6 @@ export default async function EditEventPage(props: {
               </ConfirmSubmitButton>
             </div>
           </form>
-        </div>
       </div>
     </div>
   );
