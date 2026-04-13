@@ -102,14 +102,14 @@ export function EditMemberModal({
 
       <div
         className={[
-          "relative w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-lg",
+          "relative w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 text-left shadow-lg",
           modalState === "closing"
             ? "translate-y-2 scale-[0.98] opacity-0 transition-all duration-180"
             : "opacity-100 translate-y-0 scale-100 transition-all duration-180",
         ].join(" ")}
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 text-left">
             <h2 className="text-base font-semibold text-slate-900">
               Edit member
             </h2>
@@ -128,11 +128,11 @@ export function EditMemberModal({
 
         <form
           action={updateMemberAction.bind(null, memberId)}
-          className="space-y-5"
+          className="space-y-5 text-left"
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <div className="mb-1 text-sm font-medium text-slate-700">
+            <label className="block text-left">
+              <div className="mb-1 text-left text-sm font-medium text-slate-700">
                 First name
               </div>
               <input
@@ -144,8 +144,8 @@ export function EditMemberModal({
               />
             </label>
 
-            <label className="block">
-              <div className="mb-1 text-sm font-medium text-slate-700">
+            <label className="block text-left">
+              <div className="mb-1 text-left text-sm font-medium text-slate-700">
                 Last name
               </div>
               <input
@@ -159,8 +159,8 @@ export function EditMemberModal({
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <label className="block">
-              <div className="mb-1 text-sm font-medium text-slate-700">
+            <label className="block text-left">
+              <div className="mb-1 text-left text-sm font-medium text-slate-700">
                 Gender
               </div>
               <select
@@ -176,8 +176,8 @@ export function EditMemberModal({
               </select>
             </label>
 
-            <label className="block">
-              <div className="mb-1 text-sm font-medium text-slate-700">
+            <label className="block text-left">
+              <div className="mb-1 text-left text-sm font-medium text-slate-700">
                 Birthdate
               </div>
               <input
@@ -189,8 +189,8 @@ export function EditMemberModal({
               />
             </label>
 
-            <label className="block">
-              <div className="mb-1 text-sm font-medium text-slate-700">
+            <label className="block text-left">
+              <div className="mb-1 text-left text-sm font-medium text-slate-700">
                 Contact number
               </div>
               <input
@@ -202,8 +202,10 @@ export function EditMemberModal({
             </label>
           </div>
 
-          <label className="block">
-            <div className="mb-1 text-sm font-medium text-slate-700">Address</div>
+          <label className="block text-left">
+            <div className="mb-1 text-left text-sm font-medium text-slate-700">
+              Address
+            </div>
             <div key={addressKey}>
               <AddressAutocomplete
                 name="address"
@@ -213,17 +215,17 @@ export function EditMemberModal({
             </div>
           </label>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-800">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+            <div className="text-left text-sm font-semibold text-slate-800">
               Family Group
             </div>
-            <div className="mt-1 text-xs text-slate-600">
+            <div className="mt-1 text-left text-xs text-slate-600">
               Choose an existing group, or enter a new family group name.
             </div>
 
             <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <div className="mb-1 text-sm font-medium text-slate-700">
+              <label className="block text-left">
+                <div className="mb-1 text-left text-sm font-medium text-slate-700">
                   Select group
                 </div>
                 <select
@@ -241,8 +243,8 @@ export function EditMemberModal({
                 </select>
               </label>
 
-              <label className="block">
-                <div className="mb-1 text-sm font-medium text-slate-700">
+              <label className="block text-left">
+                <div className="mb-1 text-left text-sm font-medium text-slate-700">
                   New group name (optional)
                 </div>
                 <input
@@ -256,7 +258,7 @@ export function EditMemberModal({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-start gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}

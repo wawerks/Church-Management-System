@@ -77,7 +77,7 @@ export function AddressAutocomplete({
   }, []);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 text-left">
       <div ref={wrapRef} className="relative">
         <input
           type="text"
@@ -93,7 +93,13 @@ export function AddressAutocomplete({
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
-          className={[className, loading ? "pr-9" : ""].filter(Boolean).join(" ")}
+          className={[
+            className,
+            "text-left",
+            loading ? "pr-9" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         />
         {loading ? (
           <span
@@ -129,7 +135,7 @@ export function AddressAutocomplete({
           </ul>
         ) : null}
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-left text-xs text-slate-500">
         Type at least 2 characters to search addresses already saved for other
         members.
       </p>
