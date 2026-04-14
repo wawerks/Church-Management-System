@@ -41,7 +41,7 @@ export async function createEventAction(formData: FormData) {
     details: { title: event.title, date: event.date.toISOString() },
   });
 
-  redirect("/events");
+  redirect("/events?eventStatus=added");
 }
 
 export async function updateEventAction(eventId: string, formData: FormData) {
@@ -73,7 +73,7 @@ export async function updateEventAction(eventId: string, formData: FormData) {
     details: { title: event.title, date: event.date.toISOString() },
   });
 
-  redirect("/events");
+  redirect("/events?eventStatus=updated");
 }
 
 export async function deleteEventAction(eventId: string) {

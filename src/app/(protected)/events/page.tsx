@@ -5,27 +5,44 @@ import type { Role } from "@/generated/prisma/enums";
 import { deleteEventAction } from "./actions";
 import { GetSubmitButton, PendingGetForm } from "@/components/form-buttons";
 import type { Prisma } from "@/generated/prisma/client";
-import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { AddEventModal } from "@/components/AddEventModal";
+import { EventRowActionsMenu } from "@/components/EventRowActionsMenu";
+import { EventStatusToast } from "@/components/EventStatusToast";
 
 function formatDate(d: Date) {
   return d.toLocaleDateString();
 }
 
+function toDateInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export default async function EventsPage(props: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?:
+    | Record<string, string | string[] | undefined>
+    | Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole(["ADMIN", "PASTOR", "TREASURER"] satisfies Role[]);
   const session = await requireSession();
   const canEdit = canMutateEvents(session.role);
 
-  const qRaw = props.searchParams?.q;
+  const resolvedSearchParams = await props.searchParams;
+  const qRaw = resolvedSearchParams?.q;
+  const eventStatusRaw = resolvedSearchParams?.eventStatus;
   const q =
     typeof qRaw === "string"
       ? qRaw.trim()
       : Array.isArray(qRaw)
         ? qRaw[0]?.trim() ?? ""
         : "";
+  const eventStatus =
+    eventStatusRaw === "added" || eventStatusRaw === "updated"
+      ? eventStatusRaw
+      : Array.isArray(eventStatusRaw) &&
+          (eventStatusRaw[0] === "added" || eventStatusRaw[0] === "updated")
+        ? eventStatusRaw[0]
+        : null;
 
   const take = 20;
   const where: Prisma.EventWhereInput = q
@@ -54,6 +71,7 @@ export default async function EventsPage(props: {
 
   return (
     <div className="space-y-4">
+      {eventStatus ? <EventStatusToast status={eventStatus} /> : null}
       <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
@@ -130,12 +148,12 @@ export default async function EventsPage(props: {
                     </td>
                     {canEdit ? (
                       <td className="px-4 py-3">
-                        <RowActionsMenu
-                          rowId={e.id}
-                          editHref={`/events/${e.id}/edit`}
+                        <EventRowActionsMenu
+                          eventId={e.id}
+                          title={e.title}
+                          description={e.description}
+                          dateInput={toDateInputValue(e.date)}
                           deleteAction={deleteEventAction.bind(null, e.id)}
-                          deleteLabel="Delete"
-                          deleteConfirmMessage="Permanently delete this event?"
                         />
                       </td>
                     ) : null}
